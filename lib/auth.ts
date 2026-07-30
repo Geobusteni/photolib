@@ -16,7 +16,8 @@ export const sessionOptions = {
   password: process.env.SESSION_SECRET!,
   cookieName: 'photolib_session',
   cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
+    // Only require secure cookies if explicitly set in env (for proxied HTTPS setups)
+    secure: process.env.COOKIE_SECURE === 'true',
     httpOnly: true,
     sameSite: 'lax' as const,
   },
