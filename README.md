@@ -1,6 +1,6 @@
 # Photolib
 
-**Version 0.1.1** — See [`CHANGELOG.md`](./CHANGELOG.md) for details.
+**Version 1.1.1** — See [`CHANGELOG.md`](./CHANGELOG.md) for details.
 
 A private photography delivery application. Clients receive a gallery — gated by a shared
 password or by their email address — where they can view and download delivered photographs.
@@ -12,7 +12,7 @@ password or by their email address — where they can view and download delivere
 - **Next.js 16** (App Router, React 19)
 - **TypeScript 5**
 - **Tailwind CSS 4**
-- **PostgreSQL** with **Prisma 7**
+- **MySQL** with **Prisma 7**
 - **Iron Session** for cookie-based auth
 - **Sharp** for thumbnail generation
 - **fflate** for ZIP creation and extraction
@@ -27,62 +27,45 @@ own values throughout.
 ### 1. Prerequisites
 
 - Node.js 20 or newer
-- A PostgreSQL 14+ server
+- MySQL 5.7+ or MariaDB 10.3+
 
-### 2. Install PostgreSQL
+### 2. Create MySQL Database
 
 **macOS (Homebrew)**
 
 ```bash
-brew install postgresql@16
-brew services start postgresql@16
-```
-
-**Docker** — creates the role and database for you, so step 3 can be skipped:
-
-```bash
-docker run --name photolib-db \
-  -e POSTGRES_USER=<db-user> \
-  -e POSTGRES_PASSWORD=<db-password> \
-  -e POSTGRES_DB=<db-name> \
-  -p 5432:5432 \
-  -d postgres:16
+brew install mysql
+brew services start mysql
+mysql -u root
+CREATE DATABASE photolib CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'photolib'@'localhost' IDENTIFIED BY 'your-password';
+GRANT ALL PRIVILEGES ON photolib.* TO 'photolib'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
 ```
 
 **Ubuntu / Debian**
 
 ```bash
-sudo apt install postgresql
-sudo systemctl start postgresql
+sudo apt install mysql-server
+sudo systemctl start mysql
+sudo mysql
+CREATE DATABASE photolib CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'photolib'@'localhost' IDENTIFIED BY 'your-password';
+GRANT ALL PRIVILEGES ON photolib.* TO 'photolib'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
 ```
 
-### 3. Create the database and its role
-
-Create the role first, then the database **owned by** it:
-
-```bash
-createuser <db-user> --pwprompt
-createdb -O <db-user> <db-name>
-```
-
-Ownership matters. On PostgreSQL 15+, `GRANT ALL PRIVILEGES ON DATABASE` does not cover the
-`public` schema, so Prisma still cannot create tables. To repair a database created without `-O`:
-
-```bash
-psql -d postgres -c "ALTER DATABASE <db-name> OWNER TO <db-user>;"
-psql -d <db-name> -c "ALTER SCHEMA public OWNER TO <db-user>;"
-```
-
-### 4. Install dependencies
+### 3. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 5. Configure
+### 4. Configure
 
-Photolib uses **one** configuration file: `.env` in the project root, in the spirit of
-WordPress's `wp-config.php`.
+Photolib uses **one** configuration file: `.env` in the project root, like WordPress's `wp-config.php`.
 
 ```bash
 cp .env.example .env
@@ -90,7 +73,7 @@ cp .env.example .env
 
 | Variable         | Description                                                 |
 |------------------|-------------------------------------------------------------|
-| `DATABASE_URL`   | PostgreSQL connection string                                 |
+| `DATABASE_URL`   | MySQL connection string                                      |
 | `SESSION_SECRET` | 32+ random characters; signs cookies and encrypts gallery passwords |
 | `UPLOAD_DIR`     | Where photos are stored. Use an absolute path in production  |
 
@@ -103,7 +86,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 A finished `.env`:
 
 ```
-DATABASE_URL='postgresql://<db-user>:<db-password>@localhost:5432/<db-name>'
+DATABASE_URL='mysql://photolib:your-password@localhost:3306/photolib'
 SESSION_SECRET='<64-hex-characters>'
 UPLOAD_DIR=./uploads
 ```
@@ -111,21 +94,21 @@ UPLOAD_DIR=./uploads
 > **Use single quotes.** Values containing `$` are otherwise read as variable references and
 > silently truncated.
 
-### 6. Create the database tables
+### 5. Create the database tables
 
 ```bash
 npx prisma migrate dev --name init   # development
 npx prisma migrate deploy            # deployments
 ```
 
-### 7. Run
+### 6. Run
 
 ```bash
 npm run dev                  # development
 npm run build && npm start   # production
 ```
 
-### 8. Create your administrator account
+### 7. Create your administrator account
 
 Open <http://localhost:3000>. With no admin in the database you are sent to `/setup` to create the
 first one. That page stops working once an admin exists.
@@ -135,38 +118,39 @@ first one. That page stops working once an admin exists.
 ## DATABASE_URL
 
 ```
-postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+mysql://USER:PASSWORD@HOST:PORT/DATABASE
 ```
 
 | Variation            | Example                                                              |
 |----------------------|----------------------------------------------------------------------|
-| Standard             | `postgresql://<db-user>:<db-password>@localhost:5432/<db-name>`       |
-| Passwordless superuser | `postgresql://<os-user>@localhost:5432/<db-name>`                   |
-| Unix socket          | `postgresql://<db-user>:<db-password>@localhost/<db-name>?host=/tmp`  |
-| Hosted provider      | `postgresql://<db-user>:<db-password>@<host>:5432/<db-name>?sslmode=require` |
+| Standard (localhost) | `mysql://photolib:your-password@localhost:3306/photolib`            |
+| Remote server        | `mysql://photolib:your-password@192.168.1.100:3306/photolib`        |
+| Custom port          | `mysql://photolib:your-password@localhost:3307/photolib`            |
 
 Passwords sit inside a URL, so `@ / : # ?` must be percent-encoded:
 
 ```bash
-node -e "console.log(encodeURIComponent('<db-password>'))"
+node -e "console.log(encodeURIComponent('your-password'))"
 ```
 
-Verify the string before running migrations:
+Verify the connection before running migrations:
 
 ```bash
-psql "postgresql://<db-user>:<db-password>@localhost:5432/<db-name>" -c "SELECT 1;"
+mysql -u photolib -p -e "SELECT 1;"
 ```
 
-| Message                               | Cause                                              |
-|---------------------------------------|----------------------------------------------------|
-| `database "<os-user>" does not exist` | No database given; add `-d postgres` or a full URL |
-| `role "<db-user>" does not exist`     | Run `createuser`                                   |
-| `password authentication failed`      | Wrong password, or it needs percent-encoding       |
-| `Connection refused`                  | Server not running, or the wrong port              |
-| `permission denied for schema public` | The role does not own the database — see step 3    |
+| Message                          | Cause                                         |
+|----------------------------------|-----------------------------------------------|
+| `Access denied for user`         | Wrong username or password                    |
+| `Unknown database`               | Database doesn't exist                        |
+| `Can't connect to MySQL server`  | MySQL not running, or wrong host/port         |
 
-To inspect a server: `psql -d postgres -l` lists databases and owners, `psql -d postgres -c "\du"`
-lists roles, and `psql -d postgres -c "SHOW port;"` reports the port.
+To inspect MySQL server:
+
+```bash
+mysql -u root -p -e "SHOW DATABASES;"  # List databases
+mysql -u root -p -e "SELECT user, host FROM mysql.user;"  # List users
+```
 
 ---
 

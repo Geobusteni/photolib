@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Alexandru Negoita
 
 import { PrismaClient } from './generated/prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
@@ -12,9 +11,7 @@ function createClient(): PrismaClient {
     throw new Error('DATABASE_URL is not set. Copy .env.example to .env and configure it.')
   }
 
-  // During Docker build, we use a placeholder connection string
-  // The actual connection is made at runtime with the real DATABASE_URL
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
+  return new PrismaClient()
 }
 
 export const prisma = globalForPrisma.prisma ?? createClient()

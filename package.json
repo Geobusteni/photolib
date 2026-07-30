@@ -1,6 +1,6 @@
 {
   "name": "photolib",
-  "version": "0.1.1",
+  "version": "1.1.1",
   "license": "GPL-3.0-or-later",
   "private": true,
   "scripts": {
@@ -10,7 +10,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",

@@ -14,6 +14,57 @@ Nothing yet.
 
 ---
 
+## [1.1.1] — 2026-07-30
+
+**Breaking Changes:** This release changes the database from PostgreSQL to MySQL and removes Docker deployment.
+
+### Changed
+
+**Database**
+- Switched from PostgreSQL to MySQL/MariaDB for simpler deployment
+- Removed `@prisma/adapter-pg` dependency
+- Updated Prisma schema to use MySQL provider
+- Simplified `lib/prisma.ts` to use standard Prisma client
+
+**Deployment**
+- Removed Docker and Docker Compose configurations
+- Removed Docker deployment scripts (`docker-deploy.sh`, `docker-update.sh`)
+- Created standard deployment scripts for production servers
+- New WordPress-style configuration (create MySQL DB in hosting panel, configure `.env`, deploy)
+
+**Documentation**
+- Completely rewrote `DEPLOYMENT.md` for MySQL + standard deployment
+- Updated `README.md` with MySQL installation and configuration
+- Removed `README-DOCKER.md`
+- Updated `.env.example` with MySQL connection format
+
+### Added
+
+**Deployment Scripts**
+- `scripts/build-production.sh` - Build for production deployment
+- `scripts/deploy-server.sh` - Deploy to server (like WordPress)
+- `scripts/update-production.sh` - Update production server
+
+### Removed
+
+- All Docker-related files and configurations
+- PostgreSQL-specific dependencies
+- Docker deployment documentation
+
+### Migration Guide
+
+If you're upgrading from 0.1.1 (PostgreSQL + Docker):
+
+1. Export your data: `docker compose exec db pg_dump -U photolib photolib > backup.sql`
+2. Remove Docker: See "Removing Docker" section in `DEPLOYMENT.md`
+3. Create MySQL database in your hosting panel
+4. Pull latest code: `git pull`
+5. Run `npm install` to update dependencies
+6. Configure `.env` with MySQL connection
+7. Import data manually or start fresh with `/setup`
+
+---
+
 ## [0.1.1] — 2026-07-30
 
 ### Added
