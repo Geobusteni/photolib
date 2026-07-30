@@ -106,6 +106,26 @@ echo "📊 Running database migrations..."
 set -a
 source .env
 set +a
+
+# Verify DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ Error: DATABASE_URL is not set in .env file"
+    echo "   Current .env contents:"
+    cat .env
+    exit 1
+fi
+
+# Show redacted connection string for debugging (hide password)
+REDACTED_URL=$(echo "$DATABASE_URL" | sed 's/:[^:@]*@/:***@/')
+echo "🔗 Database URL (redacted): $REDACTED_URL"
+
+# Check if prisma.config.ts exists
+if [ ! -f "prisma.config.ts" ]; then
+    echo "⚠️  Warning: prisma.config.ts not found"
+fi
+
+# Run migrations with more verbose output
+echo "🔧 Running prisma migrate deploy..."
 npx prisma migrate deploy
 
 echo "🔄 Restarting service..."

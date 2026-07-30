@@ -46,6 +46,7 @@ jobs:
           cp -r prisma deploy/
           cp package.json deploy/
           cp package-lock.json deploy/
+          cp prisma.config.ts deploy/
           cp .env.example deploy/
           
           # Install only production dependencies in the deploy folder
