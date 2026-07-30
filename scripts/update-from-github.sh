@@ -69,10 +69,22 @@ echo "🔧 Checking for .env..."
 if [ ! -f ".env" ]; then
     echo "⚠️  .env not found. Copying .env.example..."
     cp .env.example .env
-    echo "👉 Action required: Edit .env with your production credentials."
+    echo ""
+    echo "❌ Error: .env file needs to be configured before proceeding."
+    echo "   Please edit .env with your production credentials:"
+    echo "   - DATABASE_URL (MySQL connection string)"
+    echo "   - SESSION_SECRET (random 32+ character string)"
+    echo "   - STORAGE_PATH (where to store uploaded photos)"
+    echo ""
+    echo "   Then run this script again."
+    exit 1
 fi
 
 echo "📊 Running database migrations..."
+# Load environment variables from .env for Prisma
+set -a
+source .env
+set +a
 npx prisma migrate deploy
 
 echo "🔄 Restarting service..."
