@@ -9,6 +9,9 @@ import DeleteProjectButton from '@/components/ui/DeleteProjectButton'
 import AdminPhotoGrid from './_components/AdminPhotoGrid'
 import UploadZone from './_components/UploadZone'
 import AssignmentManager from './_components/AssignmentManager'
+import ArchiveManager from './_components/ArchiveManager'
+import PasswordReveal from './_components/PasswordReveal'
+import { decryptSecret } from '@/lib/crypto'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -53,6 +56,9 @@ export default async function EditProjectPage({ params }: Props) {
   const assignments = isAdmin ? await getProjectAssignments(id) : []
   const allUsers = isAdmin ? await listUsers() : []
 
+  // Only an admin ever sees the gallery password in the clear.
+  const galleryPassword = isAdmin ? decryptSecret(project.password) : null
+
   return (
     <div className="flex flex-col gap-10">
       <div className="flex items-start justify-between gap-4">
@@ -78,6 +84,14 @@ export default async function EditProjectPage({ params }: Props) {
       <dl className="flex flex-wrap gap-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <Stat label="Photos" value={photos.length} />
         <Stat label="Access" value={project.accessType === 'EMAIL' ? 'Email based' : 'Password'} />
+        {galleryPassword && (
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs text-zinc-500">Gallery password</dt>
+            <dd>
+              <PasswordReveal password={galleryPassword} />
+            </dd>
+          </div>
+        )}
         <Stat label="Gallery visits" value={project.visitCount} />
         <Stat label="Downloads" value={project.dlCount} />
         <Stat label="Last access" value={formatDate(project.lastAccess)} />
@@ -89,12 +103,26 @@ export default async function EditProjectPage({ params }: Props) {
         {photos.length > 0 && (
           <div className="mt-4">
             <AdminPhotoGrid
-              photos={photos.map((p) => ({ id: p.id, filename: p.filename }))}
+              photos={photos.map((p) => ({
+                id: p.id,
+                filename: p.filename,
+                originalName: p.originalName,
+              }))}
               projectId={id}
             />
           </div>
         )}
       </section>
+
+      {isAdmin && (
+        <section>
+          <ArchiveManager
+            projectId={id}
+            archiveName={project.archiveName}
+            archiveSize={project.archiveSize}
+          />
+        </section>
+      )}
 
       {isAdmin && (
         <section>

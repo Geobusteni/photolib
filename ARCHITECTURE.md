@@ -139,7 +139,9 @@ erDiagram
         string title
         datetime eventDate
         AccessType accessType "PASSWORD | EMAIL"
-        string password "bcrypt, null when EMAIL"
+        string password "AES-256-GCM, null when EMAIL"
+        string archiveName "null until an archive is uploaded"
+        int archiveSize
         datetime expiresAt
         boolean zipEnabled
         boolean dlEnabled
@@ -155,13 +157,17 @@ erDiagram
     Photo {
         string id PK
         string projectId FK
-        string filename
+        string filename "generated UUID, on disk"
+        string originalName "as uploaded, used for downloads"
         int width
         int height
         int size
         int sortOrder
     }
 ```
+
+`Photo` has a composite unique constraint on `(projectId, originalName)`. That constraint is what
+makes duplicate detection at upload time possible.
 
 `ProjectAssignment` has a composite unique constraint on `(projectId, userId)`, which lets the
 code use `upsert` for idempotent assignment.
@@ -239,18 +245,25 @@ DELETE /api/projects/[id]               Delete project + files (admin)
 GET    /api/projects/[id]/assignments   List assigned people (admin)
 POST   /api/projects/[id]/assignments   Assign a user/guest (admin)
 DELETE /api/projects/[id]/assignments   Unassign (admin)
-POST   /api/projects/[id]/upload        JPEG or ZIP (admin)
+POST   /api/projects/[id]/upload        JPEG or ZIP of photos (admin)
+POST   /api/projects/[id]/archive       Upload the client-facing ZIP (admin)
+DELETE /api/projects/[id]/archive       Remove it (admin)
 DELETE /api/projects/[id]/photos/[pid]  Delete photo + files (admin)
 ```
+
+`POST /upload` accepts a `strategy` field alongside the file: `overwrite`, `rename`, or `skip`.
+Without one it defaults to `ask` and answers **409** with a `conflicts` array of the original names
+that already exist. A 409 here is a question, not a failure.
 
 ### Gallery (client)
 
 ```
-POST   /api/projects/[id]/auth          { password } or { email } → gallery cookie
-GET    /api/projects/[id]/photos        Photo list (requires access)
-GET    /api/projects/[id]/download      Full ZIP (requires zipEnabled)
-POST   /api/projects/[id]/download      { photoIds } → ZIP of selection
-GET    /api/uploads/[...path]           Serve a thumbnail or original
+POST   /api/projects/[id]/auth                    { password } or { email } → gallery cookie
+GET    /api/projects/[id]/photos                  Photo list (requires access)
+GET    /api/projects/[id]/download                The uploaded archive; 404 if none
+POST   /api/projects/[id]/download                { photoIds } → ZIP of selection
+GET    /api/projects/[id]/photos/[pid]/download   One original, under its original name
+GET    /api/uploads/[...path]                     Thumbnails only
 ```
 
 ---
@@ -262,15 +275,23 @@ uploads/
   [project-id]/
     photos/    originals, named [uuid].jpg
     thumbs/    [uuid]-sm.jpg (400px), [uuid]-lg.jpg (1200px)
-    archive/   reserved
+    archive/   archive.zip — the ZIP the photographer uploaded, if any
 ```
 
 Thumbnails are generated **once at upload**. Originals are never resized per request.
-Uploaded filenames are discarded in favour of a generated UUID, which removes an entire class
-of path and encoding bugs.
 
-`safeResolvePath()` in `lib/storage.ts` rejects any resolved path that escapes the project
-directory.
+### Filenames
+
+Disk names and display names are deliberately separate. On disk every photo is a generated UUID,
+which keeps path traversal, encoding, and collision problems away from the filesystem.
+`Photo.originalName` holds the uploaded name in the database.
+
+Downloads bridge the two: `/api/projects/[id]/photos/[pid]/download` reads the UUID file and sets
+`Content-Disposition` from `originalName`. Selection ZIPs name their entries the same way.
+
+`safeResolvePath()` in `lib/storage.ts` rejects any resolved path escaping the project directory.
+`/api/uploads/[...path]` serves **thumbnails only**; originals and archives go through routes that
+check access and record the download.
 
 ---
 
@@ -313,6 +334,9 @@ That constraint lives in the reducer rather than in scattered conditionals.
 | `ViewerControls`   | Prev/Next/Download/Fullscreen/Close                 |
 | `UserManager`      | Admin user CRUD                                     |
 | `AssignmentManager`| Assign users and guests to a project                |
+| `ArchiveManager`   | Upload/replace/remove the client-facing ZIP         |
+| `PasswordReveal`   | Show and copy a project's gallery password          |
+| `UploadZone`       | Photo upload, including duplicate resolution        |
 
 ---
 
@@ -336,8 +360,15 @@ That constraint lives in the reducer rather than in scattered conditionals.
 | Iron Session over NextAuth        | No OAuth needed; sessions are two small signed cookies        |
 | Guests without passwords          | The photographer often has an email but no account to create  |
 | UUID filenames on disk            | Avoids traversal, encoding, and collision issues entirely     |
+| `originalName` stored separately  | Clients need the name they recognise; the disk does not       |
+| Gallery passwords encrypted, not hashed | The photographer must read them back to send them on. Account passwords stay bcrypt-hashed |
+| Archive uploaded, never generated | Zipping thousands of originals per request is slow and memory-hungry, and duplicates an export the photographer already has |
+| `/api/uploads` serves thumbs only | Originals and archives have routes that check access and count downloads; a second unguarded path defeated both |
+| Upload conflicts answer 409       | Silently overwriting a client's photo is worse than asking     |
 | `sortOrder` counts up from max    | Prisma `Int` is a 32-bit PostgreSQL `INTEGER`; `Date.now()` overflows it |
 | Upload deletes files on failure   | A failed insert used to leave orphaned files on disk          |
+| Viewer focuses the dialog, not a button | The old focus holder used `focus:not-sr-only` and painted a stray label over the controls |
+| Viewer exits fullscreen on unmount | Closing while fullscreen used to leave the browser fullscreen on an empty page |
 | fflate over archiver              | Pure ESM, no CJS interop problems; handles both zip and unzip |
 | `useReducer` over a state library | One screen of state; a library would be pure overhead         |
 | Pointer Events for gestures       | Native browser API, no dependency                             |

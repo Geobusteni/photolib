@@ -828,6 +828,7 @@ Mark each phase done as it is verified:
 - [x] Phase 8 — Accessibility & Polish
 - [x] Phase 9 — Hardening & Deployment Prep
 - [x] Phase 10 — PostgreSQL, Prisma, Roles and Access Types
+- [x] Phase 11 — Password Visibility, Uploaded Archives, Original Filenames
 
 ---
 
@@ -884,6 +885,65 @@ Replaced the single-admin SQLite build with a multi-user PostgreSQL application.
 
 Requires a running PostgreSQL server, which was not available on the development machine:
 
-- [ ] Apply the migration (`npx prisma migrate dev --name init`)
+- [x] Apply the migration (`npx prisma migrate dev --name init`)
 - [ ] Walk through setup → login → create project → upload → gallery end to end
 - [ ] Re-run the accessibility checklist against the new setup, users, and access-gate screens
+
+---
+
+## Phase 11 — Password Visibility, Uploaded Archives, Original Filenames `[DONE]`
+
+### Gallery passwords are readable
+
+Bcrypt hashes cannot be read back, so a password could only be reset, never looked up. Gallery
+passwords now live as AES-256-GCM ciphertext (`lib/crypto.ts`) keyed off `SESSION_SECRET`, and the
+project page shows them with **Show** and **Copy**. Account passwords stay on bcrypt.
+
+The migration clears existing project passwords — old hashes cannot be decrypted, so those
+projects need a new password set.
+
+### The archive is uploaded, not generated
+
+`GET /download` used to zip every original on demand. `Project.archiveName` / `archiveSize` now
+record an admin-uploaded ZIP at `uploads/[id]/archive/archive.zip`, posted to
+`/api/projects/[id]/archive`. The gallery shows **Download ZIP** only when that archive exists;
+`GET /download` streams it and 404s otherwise.
+
+Zipping a client's own selection (`POST /download`) is unchanged.
+
+### Photos keep their original names
+
+`Photo.filename` stays a generated UUID; `Photo.originalName` holds the uploaded name, with a
+`(projectId, originalName)` unique constraint making duplicates detectable. The new route
+`/api/projects/[id]/photos/[pid]/download` sets `Content-Disposition` from `originalName`, and
+selection ZIPs name entries the same way.
+
+Duplicate uploads return **409** with the conflicting names. `UploadZone` offers **Keep both**
+(`name (2).jpg`) or **Replace existing** and re-sends with a `strategy` field.
+
+`/api/uploads/[...path]` now serves thumbnails only. It previously served anything under the
+project directory with no access check, bypassing the routes that verify access and count
+downloads.
+
+### CSS and lightbox fixes
+
+- Gallery grid moved into a centred container at 80% width (90% on small screens, capped at
+  1600px) with padding above and below, instead of running edge to edge.
+- **Download ZIP** had a fixed height but no flex centering. Both toolbars now share one
+  `inline-flex items-center justify-center` class.
+- The first-open glitch was a focus holder styled `sr-only focus:not-sr-only`; focusing it on open
+  rendered a "Close viewer" text block over the controls. The viewer now focuses the dialog itself
+  and traps Tab within it.
+- Unmounting calls `exitFullscreen()`, Escape exits fullscreen before closing, and body scroll is
+  locked while the lightbox is open.
+
+### Verification
+
+`tsc --noEmit`, `npm run lint`, and `npm run build` all clean. Migration applied. An end-to-end
+script covering login, upload, duplicate resolution, archive upload, and every download path
+passed 23/23 against a running server.
+
+### Not done
+
+- [ ] Manual browser walkthrough of the conflict dialog and archive panel
+- [ ] Re-run the accessibility checklist over those two new surfaces

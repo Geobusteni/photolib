@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGestures } from '@/hooks/useGestures'
 import { useKeyboard } from '@/hooks/useKeyboard'
-import { useReducedMotion } from '@/hooks/useReducedMotion'
 import ViewerControls from './ViewerControls'
 import type { PhotoData } from '@/components/gallery/ImageTile'
 
@@ -17,6 +16,8 @@ interface PhotoViewerProps {
   onLast: () => void
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export default function PhotoViewer({
   photos,
   currentIndex,
@@ -26,9 +27,8 @@ export default function PhotoViewer({
   onFirst,
   onLast,
 }: PhotoViewerProps) {
-  const reduced = useReducedMotion()
+  const dialogRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -39,68 +39,99 @@ export default function PhotoViewer({
   const resetHideTimer = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
     setControlsVisible(true)
-    if (isFullscreen) {
-      hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
-    }
+    if (isFullscreen) hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
   }, [isFullscreen])
 
+  // Focus the dialog itself rather than a control, so opening the viewer never
+  // reveals a focus-styled button on top of the image.
   useEffect(() => {
-    closeButtonRef.current?.focus()
+    dialogRef.current?.focus({ preventScroll: true })
+    const timer = hideTimer
     return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current)
+      if (timer.current) clearTimeout(timer.current)
     }
   }, [])
 
-  // Controls only auto-hide in fullscreen; leaving it restores them permanently.
+  // The page keeps scrolling behind an open lightbox otherwise.
   useEffect(() => {
-    const timer = hideTimer.current
-    if (!isFullscreen) {
-      if (timer) clearTimeout(timer)
-      return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
     }
+  }, [])
+
+  // Closing the viewer must also leave the browser's fullscreen mode, otherwise
+  // the page stays fullscreen with nothing in it.
+  useEffect(() => {
+    return () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  // Controls only auto-hide in fullscreen; leaving it restores them for good.
+  useEffect(() => {
+    if (!isFullscreen) return
     hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current)
     }
   }, [isFullscreen])
 
-  // Sync fullscreen state with browser API
   useEffect(() => {
     function onFsChange() {
-      setIsFullscreen(!!document.fullscreenElement)
+      const active = !!document.fullscreenElement
+      setIsFullscreen(active)
+      if (!active) {
+        if (hideTimer.current) clearTimeout(hideTimer.current)
+        setControlsVisible(true)
+      }
     }
     document.addEventListener('fullscreenchange', onFsChange)
     return () => document.removeEventListener('fullscreenchange', onFsChange)
   }, [])
 
-  function toggleFullscreen() {
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {})
     } else {
       document.exitFullscreen().catch(() => {})
     }
-  }
+  }, [])
 
   const download = useCallback(() => {
-    if (photo?.original) window.open(`${photo.original}?download`, '_blank')
+    if (photo?.original) window.location.href = photo.original
   }, [photo])
 
   const keyMap = useMemo(
     () => ({
+      // Escape steps out of fullscreen first, then closes.
       Escape: () => {
-        if (isFullscreen) document.exitFullscreen().catch(() => {})
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
         else onClose()
       },
-      ArrowLeft: () => { onPrev(); resetHideTimer() },
-      ArrowRight: () => { onNext(); resetHideTimer() },
-      Home: () => { onFirst(); resetHideTimer() },
-      End: () => { onLast(); resetHideTimer() },
+      ArrowLeft: () => {
+        onPrev()
+        resetHideTimer()
+      },
+      ArrowRight: () => {
+        onNext()
+        resetHideTimer()
+      },
+      Home: () => {
+        onFirst()
+        resetHideTimer()
+      },
+      End: () => {
+        onLast()
+        resetHideTimer()
+      },
       f: toggleFullscreen,
       F: toggleFullscreen,
       d: download,
       D: download,
     }),
-    [isFullscreen, onClose, onPrev, onNext, onFirst, onLast, download, resetHideTimer]
+    [onClose, onPrev, onNext, onFirst, onLast, download, resetHideTimer, toggleFullscreen]
   )
 
   useKeyboard(keyMap, true)
@@ -116,30 +147,42 @@ export default function PhotoViewer({
     },
   })
 
+  function trapFocus(e: React.KeyboardEvent) {
+    if (e.key !== 'Tab' || !dialogRef.current) return
+    const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (el) => el.offsetParent !== null || el === document.activeElement
+    )
+    if (items.length === 0) {
+      e.preventDefault()
+      return
+    }
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   if (!photo) return null
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal
+      tabIndex={-1}
       aria-label={`Photo viewer: image ${currentIndex + 1} of ${photos.length}`}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black ${reduced ? '' : ''}`}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black focus:outline-none"
       onMouseMove={resetHideTimer}
+      onKeyDown={trapFocus}
     >
-      {/* Hidden close button to hold focus on open */}
-      <button
-        ref={closeButtonRef}
-        onClick={onClose}
-        aria-label="Close viewer"
-        className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-4 focus:z-10 focus:rounded-lg focus:bg-white/10 focus:px-4 focus:py-2 focus:text-white"
-      >
-        Close viewer
-      </button>
-
-      {/* Image area — takes pointer events for gestures */}
       <div
         ref={containerRef}
-        className="absolute inset-0 flex items-center justify-center touch-none select-none"
+        className="absolute inset-0 flex touch-none select-none items-center justify-center"
         style={{ touchAction: 'none' }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -156,7 +199,6 @@ export default function PhotoViewer({
       <ViewerControls
         currentIndex={currentIndex}
         total={photos.length}
-        dlEnabled={!!photo.original}
         downloadUrl={photo.original}
         isFullscreen={isFullscreen}
         controlsVisible={controlsVisible}
@@ -166,11 +208,10 @@ export default function PhotoViewer({
         onToggleFullscreen={toggleFullscreen}
       />
 
-      {/* Mobile action panel (swipe up) */}
       {actionPanel && photo.original && (
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 rounded-t-2xl bg-zinc-900 p-6 sm:hidden">
           <a
-            href={`${photo.original}?download`}
+            href={photo.original}
             download
             className="flex h-12 items-center justify-center rounded-xl bg-white text-sm font-medium text-zinc-900"
             onClick={() => setActionPanel(false)}

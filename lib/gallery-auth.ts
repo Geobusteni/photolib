@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { getIronSession } from 'iron-session'
 import { getSession } from './auth'
 import prisma from './prisma'
-import bcrypt from 'bcryptjs'
+import { decryptSecret, secretsMatch } from './crypto'
 
 interface GallerySessionData {
   projectId: string
@@ -60,8 +60,10 @@ export async function grantGalleryAccess(projectId: string, email?: string): Pro
   await gallerySession.save()
 }
 
-export async function verifyPasswordAccess(plain: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(plain, hash)
+export function verifyPasswordAccess(plain: string, stored: string): boolean {
+  const actual = decryptSecret(stored)
+  if (actual === null) return false
+  return secretsMatch(plain, actual)
 }
 
 export async function verifyEmailAccess(projectId: string, email: string): Promise<boolean> {

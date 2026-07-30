@@ -1,7 +1,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createProject, listProjects } from '@/lib/projects'
 import { ensureProjectDirs } from '@/lib/storage'
-import bcrypt from 'bcryptjs'
+import { encryptSecret } from '@/lib/crypto'
 
 export async function GET() {
   await requireAdmin()
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     title: body.title,
     eventDate: body.eventDate ? new Date(body.eventDate) : null,
     accessType,
-    password: accessType === 'PASSWORD' ? await bcrypt.hash(body.password, 12) : null,
+    password: accessType === 'PASSWORD' ? encryptSecret(body.password) : null,
     expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
     zipEnabled: body.zipEnabled !== false,
     dlEnabled: body.dlEnabled !== false,

@@ -1,5 +1,7 @@
 # Photolib
 
+**Version 0.1.0** — first beta. See [`CHANGELOG.md`](./CHANGELOG.md).
+
 A private photography delivery application. Clients receive a gallery — gated by a shared
 password or by their email address — where they can view and download delivered photographs.
 
@@ -19,14 +21,15 @@ password or by their email address — where they can view and download delivere
 
 ## Installation
 
+Placeholders below are written as `<db-user>`, `<db-name>`, and `<db-password>`. Substitute your
+own values throughout.
+
 ### 1. Prerequisites
 
 - Node.js 20 or newer
 - A PostgreSQL 14+ server
 
 ### 2. Install PostgreSQL
-
-Pick whichever suits your machine.
 
 **macOS (Homebrew)**
 
@@ -35,13 +38,13 @@ brew install postgresql@16
 brew services start postgresql@16
 ```
 
-**Docker**
+**Docker** — creates the role and database for you, so step 3 can be skipped:
 
 ```bash
 docker run --name photolib-db \
-  -e POSTGRES_USER=photolib \
-  -e POSTGRES_PASSWORD=yourpassword \
-  -e POSTGRES_DB=photolib \
+  -e POSTGRES_USER=<db-user> \
+  -e POSTGRES_PASSWORD=<db-password> \
+  -e POSTGRES_DB=<db-name> \
   -p 5432:5432 \
   -d postgres:16
 ```
@@ -53,50 +56,22 @@ sudo apt install postgresql
 sudo systemctl start postgresql
 ```
 
-### 3. Create the database and its user
+### 3. Create the database and its role
 
-Skip this entirely if you used the Docker command above — it creates the user and database
-for you.
-
-Create the **role first**, then create the database **owned by that role**:
+Create the role first, then the database **owned by** it:
 
 ```bash
-createuser photolib --pwprompt      # prompts for a password
-createdb -O photolib photolib       # -O sets photolib as the owner
+createuser <db-user> --pwprompt
+createdb -O <db-user> <db-name>
 ```
 
-That is the whole setup. Because `photolib` owns the database, it already has every privilege
-on it and no `GRANT` is needed.
-
-> **Why not `createdb photolib` followed by a `GRANT`?**
->
-> Two things go wrong. First, a bare `psql -c "..."` connects to a database named after your
-> operating system user, which does not exist on a fresh Homebrew install:
->
-> ```
-> psql: error: FATAL:  database "alex" does not exist
-> ```
->
-> You would need `psql -d postgres -c "..."` to give it a database that does exist. Second,
-> on PostgreSQL 15 and newer, `GRANT ALL PRIVILEGES ON DATABASE` is not sufficient anyway —
-> it does not grant rights on the `public` schema, so Prisma still fails to create tables.
-> Making the role the owner with `-O` sidesteps both problems.
-
-If you already created the database the wrong way, fix the ownership rather than granting:
+Ownership matters. On PostgreSQL 15+, `GRANT ALL PRIVILEGES ON DATABASE` does not cover the
+`public` schema, so Prisma still cannot create tables. To repair a database created without `-O`:
 
 ```bash
-psql -d postgres -c "ALTER DATABASE photolib OWNER TO photolib;"
-psql -d photolib -c "ALTER SCHEMA public OWNER TO photolib;"
+psql -d postgres -c "ALTER DATABASE <db-name> OWNER TO <db-user>;"
+psql -d <db-name> -c "ALTER SCHEMA public OWNER TO <db-user>;"
 ```
-
-Verify it worked:
-
-```bash
-psql -d postgres -l          # list databases and their owners
-psql -d postgres -c "\du"    # list roles
-```
-
-You should see `photolib` listed as the owner of the `photolib` database.
 
 ### 4. Install dependencies
 
@@ -107,17 +82,17 @@ npm install
 ### 5. Configure
 
 Photolib uses **one** configuration file: `.env` in the project root, in the spirit of
-WordPress's `wp-config.php`. Copy the template and fill it in:
+WordPress's `wp-config.php`.
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable         | Description                                                       |
-|------------------|-------------------------------------------------------------------|
-| `DATABASE_URL`   | PostgreSQL connection string                                      |
-| `SESSION_SECRET` | 32+ random characters used to sign session cookies                |
-| `UPLOAD_DIR`     | Where photos are stored. Use an absolute path in production        |
+| Variable         | Description                                                 |
+|------------------|-------------------------------------------------------------|
+| `DATABASE_URL`   | PostgreSQL connection string                                 |
+| `SESSION_SECRET` | 32+ random characters; signs cookies and encrypts gallery passwords |
+| `UPLOAD_DIR`     | Where photos are stored. Use an absolute path in production  |
 
 Generate a session secret:
 
@@ -125,164 +100,86 @@ Generate a session secret:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-A finished `.env` looks like this:
+A finished `.env`:
 
 ```
-DATABASE_URL='postgresql://photolib:yourpassword@localhost:5432/photolib'
-SESSION_SECRET='3f9a...c21e'
+DATABASE_URL='postgresql://<db-user>:<db-password>@localhost:5432/<db-name>'
+SESSION_SECRET='<64-hex-characters>'
 UPLOAD_DIR=./uploads
 ```
 
-> **Use single quotes.** Values containing `$` — bcrypt hashes, some database passwords — are
-> otherwise read as variable references and silently truncated.
-
----
-
-## Finding your DATABASE_URL
-
-The connection string always follows this shape:
-
-```
-postgresql://USER:PASSWORD@HOST:PORT/DATABASE
-```
-
-| Part       | Meaning                          | Typical local value |
-|------------|----------------------------------|---------------------|
-| `USER`     | PostgreSQL role name             | `photolib`          |
-| `PASSWORD` | That role's password             | whatever you set    |
-| `HOST`     | Server address                   | `localhost`         |
-| `PORT`     | Server port                      | `5432`              |
-| `DATABASE` | Database name                    | `photolib`          |
-
-Following the setup above, that gives:
-
-```
-DATABASE_URL='postgresql://photolib:yourpassword@localhost:5432/photolib'
-```
-
-### If you are unsure of the values
-
-**Which port is PostgreSQL on?**
-
-```bash
-psql -d postgres -c "SHOW port;"
-```
-
-Homebrew uses `5432` by default. A second installed version often uses `5433`.
-
-**Which databases and roles exist?**
-
-```bash
-psql -d postgres -l          # databases, with owners
-psql -d postgres -c "\du"    # roles
-```
-
-**What is the full connection string of a live session?**
-
-Connect and ask:
-
-```bash
-psql -d photolib -c "\conninfo"
-```
-
-```
-You are connected to database "photolib" as user "photolib"
-on host "localhost" (address "127.0.0.1") at port "5432".
-```
-
-### Common variations
-
-**Docker** — matches the `-e` values and the host-side port you published:
-
-```
-DATABASE_URL='postgresql://photolib:yourpassword@localhost:5432/photolib'
-```
-
-**Your macOS user as a superuser** (Homebrew creates one named after you, with no password):
-
-```
-DATABASE_URL='postgresql://alex@localhost:5432/photolib'
-```
-
-**Unix socket instead of TCP** — no host, pointing at the socket directory:
-
-```
-DATABASE_URL='postgresql://photolib:yourpassword@localhost/photolib?host=/tmp'
-```
-
-**Hosted provider** (Neon, Supabase, Railway, RDS) — copy the string from their dashboard.
-Most require TLS:
-
-```
-DATABASE_URL='postgresql://user:pass@db.example.com:5432/photolib?sslmode=require'
-```
-
-### Special characters in the password
-
-The password sits inside a URL, so characters like `@`, `/`, `:`, `#`, and `?` must be
-percent-encoded or they will break parsing. `p@ss/word` becomes `p%40ss%2Fword`.
-
-Encode one safely:
-
-```bash
-node -e "console.log(encodeURIComponent('p@ss/word'))"
-```
-
-Avoiding punctuation in the database password is the simpler path.
-
-### Check the string actually works
-
-```bash
-psql "postgresql://photolib:yourpassword@localhost:5432/photolib" -c "SELECT 1;"
-```
-
-A `1` back means Prisma will connect too. Common failures:
-
-| Message                               | Cause                                             |
-|---------------------------------------|---------------------------------------------------|
-| `database "alex" does not exist`      | No database given; add `-d postgres` or a full URL |
-| `role "photolib" does not exist`      | The role was never created — run `createuser`      |
-| `password authentication failed`      | Wrong password, or it needs percent-encoding       |
-| `Connection refused`                  | Server not running, or the wrong port              |
-| `permission denied for schema public` | The role does not own the database — see step 3    |
+> **Use single quotes.** Values containing `$` are otherwise read as variable references and
+> silently truncated.
 
 ### 6. Create the database tables
 
 ```bash
-npx prisma migrate dev --name init
-```
-
-For subsequent deployments, apply existing migrations instead:
-
-```bash
-npx prisma migrate deploy
+npx prisma migrate dev --name init   # development
+npx prisma migrate deploy            # deployments
 ```
 
 ### 7. Run
 
 ```bash
-npm run dev          # development
+npm run dev                  # development
 npm run build && npm start   # production
 ```
 
 ### 8. Create your administrator account
 
-Open <http://localhost:3000>. Because the database has no admin yet, you will be sent to
-`/setup` to create the first one. That page stops working the moment an admin exists.
+Open <http://localhost:3000>. With no admin in the database you are sent to `/setup` to create the
+first one. That page stops working once an admin exists.
+
+---
+
+## DATABASE_URL
+
+```
+postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+```
+
+| Variation            | Example                                                              |
+|----------------------|----------------------------------------------------------------------|
+| Standard             | `postgresql://<db-user>:<db-password>@localhost:5432/<db-name>`       |
+| Passwordless superuser | `postgresql://<os-user>@localhost:5432/<db-name>`                   |
+| Unix socket          | `postgresql://<db-user>:<db-password>@localhost/<db-name>?host=/tmp`  |
+| Hosted provider      | `postgresql://<db-user>:<db-password>@<host>:5432/<db-name>?sslmode=require` |
+
+Passwords sit inside a URL, so `@ / : # ?` must be percent-encoded:
+
+```bash
+node -e "console.log(encodeURIComponent('<db-password>'))"
+```
+
+Verify the string before running migrations:
+
+```bash
+psql "postgresql://<db-user>:<db-password>@localhost:5432/<db-name>" -c "SELECT 1;"
+```
+
+| Message                               | Cause                                              |
+|---------------------------------------|----------------------------------------------------|
+| `database "<os-user>" does not exist` | No database given; add `-d postgres` or a full URL |
+| `role "<db-user>" does not exist`     | Run `createuser`                                   |
+| `password authentication failed`      | Wrong password, or it needs percent-encoding       |
+| `Connection refused`                  | Server not running, or the wrong port              |
+| `permission denied for schema public` | The role does not own the database — see step 3    |
+
+To inspect a server: `psql -d postgres -l` lists databases and owners, `psql -d postgres -c "\du"`
+lists roles, and `psql -d postgres -c "SHOW port;"` reports the port.
 
 ---
 
 ## Roles
 
-| Role      | Signs in with           | Can do                                                     |
-|-----------|-------------------------|-------------------------------------------------------------|
-| **Admin** | Username or email + password | Everything: projects, uploads, users, assignments      |
-| **User**  | Username or email + password | Only the projects they are assigned to                 |
-| **Guest** | Nothing — email only    | View assigned email-based galleries, read only              |
+| Role      | Signs in with                | Can do                                            |
+|-----------|------------------------------|---------------------------------------------------|
+| **Admin** | Username or email + password | Everything: projects, uploads, users, assignments |
+| **User**  | Username or email + password | Only the projects they are assigned to            |
+| **Guest** | Nothing — email only         | View assigned email-based galleries, read only    |
 
 Admins create every account from **Users** in the top navigation. Guests need only an email
-address; admins and users also need a username and a password of at least 8 characters. Any
-account may optionally carry a name.
+address; admins and users also need a username and a password of at least 8 characters.
 
 The last remaining administrator cannot be deleted or demoted.
 
@@ -290,18 +187,22 @@ The last remaining administrator cannot be deleted or demoted.
 
 ## Project access types
 
-Each project is gated one of two ways, chosen when you create it and changeable later.
-
-| Type               | How viewers get in                    | Use when                                       |
-|--------------------|----------------------------------------|------------------------------------------------|
-| **Password**       | One shared password you give out       | You do not have everyone's email address       |
-| **Email based**    | Viewer types their own email address   | You know exactly who should see the gallery    |
+| Type            | How viewers get in                   | Use when                                    |
+|-----------------|--------------------------------------|---------------------------------------------|
+| **Password**    | One shared password you give out     | You do not have everyone's email address    |
+| **Email based** | Viewer types their own email address | You know exactly who should see the gallery |
 
 For email-based projects, add the guests under **People** on the project page. Only assigned
-email addresses are admitted.
+email addresses are admitted. Both types are read only for viewers.
 
-Both types are currently **read only** for viewers. Email-based access exists so that per-person
-features such as client culling and notes can be added later.
+### Looking up a gallery password
+
+The project page shows the password under **Gallery password**, with **Show** and **Copy** beside
+it, so you can send it to a client without resetting it.
+
+Gallery passwords are encrypted rather than hashed so they can be read back. The key comes from
+`SESSION_SECRET` — changing it makes existing gallery passwords unreadable and they must be set
+again. Account passwords remain hashed and cannot be read back.
 
 ---
 
@@ -312,12 +213,33 @@ features such as client culling and notes can be added later.
 Sign in at `/login`. From **Projects** you can:
 
 - Create a project (title, event date, access type, password, expiration, download toggles)
-- Upload JPEG photos or a ZIP archive by dragging them onto the upload area
+- Upload JPEG photos, or a ZIP that Photolib unpacks into photos
+- Upload the client-facing archive under **Download archive**
 - Assign users and guests under **People**
+- View and copy the gallery password
 - Watch visit count, download count, and last access
 - Delete the project and all its files
 
 Share the gallery URL shown on the project page: `/g/[project-id]`.
+
+#### Filenames and duplicates
+
+Photos keep the name you uploaded them under; the generated name used on disk is never shown to
+clients.
+
+Uploading a name that already exists in the project prompts for a choice:
+
+- **Keep both** — saved as `beach-042 (2).jpg`
+- **Replace existing** — the old photo is overwritten and keeps its name
+- **Cancel** — nothing is imported
+
+#### The Download ZIP button
+
+Clients see **Download ZIP** only when you upload an archive under **Download archive**. Photolib
+never builds a full archive itself — upload the export from your editing software instead.
+
+Clients can always zip their own selection; that is generated on demand regardless. The **Offer
+the uploaded archive for download** toggle hides the button without deleting the archive.
 
 ### Client gallery
 
@@ -330,12 +252,12 @@ Share the gallery URL shown on the project page: `/g/[project-id]`.
 
 **Gallery**
 
-| Key      | Action                |
-|----------|-----------------------|
-| `S`      | Toggle selection mode |
-| `Escape` | Cancel selection      |
-| `D`      | Download selected     |
-| `Z`      | Download ZIP          |
+| Key      | Action                                |
+|----------|---------------------------------------|
+| `S`      | Toggle selection mode                 |
+| `Escape` | Cancel selection                      |
+| `D`      | Download selected                     |
+| `Z`      | Download the archive, when one exists |
 
 **Lightbox**
 
@@ -355,13 +277,14 @@ Share the gallery URL shown on the project page: `/g/[project-id]`.
 ```
 uploads/
   [project-id]/
-    photos/    originals
+    photos/    originals, under generated names
     thumbs/    generated thumbnails (400px and 1200px wide)
-    archive/   reserved
+    archive/   the ZIP you uploaded for clients, if any
 ```
 
-Both `uploads/` and `.env` are gitignored. Back up `uploads/` and your PostgreSQL database
-separately in production — deleting a project deletes its files irreversibly.
+Uploaded filenames live in the database, not on disk, and are reattached on download. Both
+`uploads/` and `.env` are gitignored — back them up separately in production, since deleting a
+project deletes its files irreversibly.
 
 ---
 
@@ -378,6 +301,7 @@ npm run lint               # lint
 
 ## Further reading
 
+- [`CHANGELOG.md`](./CHANGELOG.md) — release history
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — data model, auth flow, API surface, component design
 - [`PLAN.md`](./PLAN.md) — phased build plan and progress
 - [`AGENTS.md`](./AGENTS.md) — philosophy, roles, and conventions for contributors

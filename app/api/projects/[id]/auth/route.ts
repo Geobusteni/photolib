@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (typeof body?.password !== 'string' || !body.password) {
     return Response.json({ error: 'Password required' }, { status: 400 })
   }
-  if (!project.password || !(await verifyPasswordAccess(body.password, project.password))) {
+  if (!project.password || !verifyPasswordAccess(body.password, project.password)) {
     return Response.json({ error: 'Incorrect password' }, { status: 401 })
   }
 

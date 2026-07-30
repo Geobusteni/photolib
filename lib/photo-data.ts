@@ -4,6 +4,7 @@ interface PhotoRecord {
   id: string
   projectId: string
   filename: string
+  originalName: string
   width: number
   height: number
 }
@@ -13,11 +14,12 @@ export function toPhotoData(photo: PhotoRecord, dlEnabled: boolean): PhotoData {
   const dir = `/api/uploads/${photo.projectId}`
   return {
     id: photo.id,
-    filename: photo.filename,
+    filename: photo.originalName,
     width: photo.width,
     height: photo.height,
     thumbSm: `${dir}/thumbs/${base}-sm.jpg`,
     thumbLg: `${dir}/thumbs/${base}-lg.jpg`,
-    original: dlEnabled ? `${dir}/photos/${photo.filename}` : null,
+    // Downloads route through the photo id so the server can restore the original name.
+    original: dlEnabled ? `/api/projects/${photo.projectId}/photos/${photo.id}/download` : null,
   }
 }

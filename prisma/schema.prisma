@@ -32,19 +32,28 @@ model User {
 }
 
 model Project {
-  id          String     @id @default(cuid())
-  title       String
-  eventDate   DateTime?
-  accessType  AccessType @default(PASSWORD)
-  password    String?
-  expiresAt   DateTime?
-  zipEnabled  Boolean    @default(true)
-  dlEnabled   Boolean    @default(true)
-  dlCount     Int        @default(0)
-  visitCount  Int        @default(0)
-  lastAccess  DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String     @id @default(cuid())
+  title      String
+  eventDate  DateTime?
+  accessType AccessType @default(PASSWORD)
+
+  /// AES-256-GCM ciphertext, not a hash — the photographer must be able to read
+  /// the password back to share it with a client.
+  password String?
+
+  /// The client-facing ZIP is uploaded by the admin, never generated from the
+  /// photos. No archive means no "Download ZIP" button.
+  archiveName String?
+  archiveSize Int?
+
+  expiresAt  DateTime?
+  zipEnabled Boolean   @default(true)
+  dlEnabled  Boolean   @default(true)
+  dlCount    Int       @default(0)
+  visitCount Int       @default(0)
+  lastAccess DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   photos      Photo[]
   assignments ProjectAssignment[]
@@ -62,13 +71,22 @@ model ProjectAssignment {
 }
 
 model Photo {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  filename  String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Generated UUID used on disk — keeps the filesystem free of traversal and
+  /// encoding hazards.
+  filename String
+
+  /// The name the photographer uploaded. Used for downloads and ZIP entries.
+  originalName String
+
   width     Int
   height    Int
   size      Int
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+
+  @@unique([projectId, originalName])
 }

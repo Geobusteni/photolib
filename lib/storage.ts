@@ -35,6 +35,17 @@ export async function deleteProjectFiles(projectId: string): Promise<void> {
   await fs.rm(dir, { recursive: true, force: true })
 }
 
+/** The client-facing ZIP is always stored under this fixed name. */
+export const ARCHIVE_FILE = 'archive.zip'
+
+export function archivePath(projectId: string): string {
+  return path.join(archiveDir(projectId), ARCHIVE_FILE)
+}
+
+export async function deleteArchiveFile(projectId: string): Promise<void> {
+  await fs.rm(archivePath(projectId), { force: true })
+}
+
 export async function deletePhotoFiles(projectId: string, filename: string): Promise<void> {
   const base = path.basename(filename, path.extname(filename))
   await Promise.all([

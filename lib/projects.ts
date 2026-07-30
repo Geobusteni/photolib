@@ -81,6 +81,7 @@ export async function getPhoto(id: string) {
 export async function insertPhoto(data: {
   projectId: string
   filename: string
+  originalName: string
   width: number
   height: number
   size: number
@@ -95,6 +96,32 @@ export async function insertPhoto(data: {
 
   return prisma.photo.create({
     data: { ...data, sortOrder: (last?.sortOrder ?? -1) + 1 },
+  })
+}
+
+export async function getPhotoByOriginalName(projectId: string, originalName: string) {
+  return prisma.photo.findUnique({
+    where: { projectId_originalName: { projectId, originalName } },
+  })
+}
+
+export async function replacePhotoFile(
+  id: string,
+  data: { filename: string; width: number; height: number; size: number }
+) {
+  return prisma.photo.update({ where: { id }, data })
+}
+
+export async function setArchive(
+  projectId: string,
+  archive: { archiveName: string; archiveSize: number } | null
+) {
+  return prisma.project.update({
+    where: { id: projectId },
+    data: {
+      archiveName: archive?.archiveName ?? null,
+      archiveSize: archive?.archiveSize ?? null,
+    },
   })
 }
 

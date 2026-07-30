@@ -132,6 +132,32 @@ Email-based access exists so that future work (client culling, notes) can attrib
 a person. Do not build those features until asked — but do not design anything that would make
 them impossible either.
 
+**Gallery passwords are encrypted, not hashed** (`lib/crypto.ts`, AES-256-GCM keyed off
+`SESSION_SECRET`), because the photographer has to read them back to send them to a client. Do not
+"fix" this to bcrypt. Account passwords are the ones that stay hashed.
+
+---
+
+## Files and Downloads
+
+Two names per photo, not interchangeable:
+
+| Field          | Value                | Used for                         |
+|----------------|----------------------|----------------------------------|
+| `filename`     | generated UUID       | the path on disk, nothing else   |
+| `originalName` | the name as uploaded | downloads, ZIP entries, admin UI |
+
+Never write a client-supplied name to disk, and never show a UUID to a client. Downloads set
+`Content-Disposition` from `originalName`.
+
+Uploading a photo whose `originalName` already exists returns **409** with the conflicting names.
+The admin re-sends with `strategy` set to `rename` or `overwrite`. Never resolve a conflict
+silently.
+
+**The client-facing ZIP is uploaded, never generated.** `Project.archiveName` is null until an
+admin uploads one, and the gallery shows "Download ZIP" only when it is set. The only ZIP Photolib
+creates is a client's own selection.
+
 ---
 
 ## Feature Scope
@@ -145,9 +171,11 @@ Do not add anything outside this scope unless explicitly requested.
 - Create / Edit / Delete users (admin, user, guest)
 - Assign users and guests to projects
 - Create / Edit / Delete project
-- Upload JPEG images
-- Upload ZIP archive
+- Upload JPEG images, or a ZIP that is unpacked into photos
+- Resolve duplicate filenames on upload (keep both / replace)
+- Upload, replace, or remove the client-facing ZIP archive
 - Set: project title, optional event date, access type, password, expiration
+- View and copy the gallery password
 - Toggle: ZIP download, image downloads
 - View: download count, gallery visit count, last access
 
@@ -156,10 +184,10 @@ Do not add anything outside this scope unless explicitly requested.
 - Password-protected or email-gated gallery
 - Responsive masonry/grid layout
 - Lightbox
-- Individual image download
+- Individual image download, under the original filename
 - Multiple image selection
 - Download selected images as ZIP
-- Download full ZIP archive
+- Download the archive the photographer uploaded, when there is one
 
 ---
 
@@ -167,9 +195,11 @@ Do not add anything outside this scope unless explicitly requested.
 
 ### Gallery — Normal Mode
 
+- The grid sits in a centred container roughly 80% of the viewport width, with space above and
+  below. It is never flush to the edges.
 - Tap/click an image opens the lightbox
 - No checkboxes, no selection indicators
-- Top bar: **Select** | **Download ZIP**
+- Top bar: **Select** | **Download ZIP** (the latter only when an archive was uploaded)
 
 ### Gallery — Selection Mode
 
@@ -194,6 +224,12 @@ Always visible: Previous, Next, Download, Fullscreen, Close.
 
 Fullscreen mode: controls auto-hide after ~3 s of inactivity; mouse movement reveals them.
 
+Two rules the lightbox must keep:
+
+- Opening it focuses the dialog element itself, never a control styled to appear on focus.
+- Closing it leaves browser fullscreen. Escape exits fullscreen first and closes on a second
+  press; unmounting exits fullscreen unconditionally.
+
 ### Keyboard Shortcuts
 
 **Gallery**
@@ -207,7 +243,7 @@ Fullscreen mode: controls auto-hide after ~3 s of inactivity; mouse movement rev
 | S             | Toggle Selection Mode        |
 | Escape        | Cancel Selection Mode        |
 | D             | Download selected            |
-| Z             | Download ZIP                 |
+| Z             | Download the archive, if one exists |
 
 **Lightbox**
 
@@ -302,11 +338,32 @@ Also keep these in sync when the relevant thing changes:
 |-------------------|------------------------------------------------------------------|
 | `README.md`       | Anything a user or operator would need to know                    |
 | `ARCHITECTURE.md` | Schema, routes, auth flow, component structure, or a real decision|
+| `CHANGELOG.md`    | Any user-visible change, in `[Unreleased]`                        |
 | `PLAN.md`         | A phase is completed, or scope changes                            |
 | `AGENTS.md`       | A rule or convention changes                                      |
 
 When you make a non-obvious decision, add a row to the decisions log in `ARCHITECTURE.md`
 explaining why — including the ones that came from a bug, so nobody reverts the fix.
+
+---
+
+## Versioning
+
+Semantic versioning, with `package.json` as the single source of truth. Current release: `0.1.0`.
+
+While the major version is `0`, breaking changes may land in a minor release.
+
+Record every user-visible change under `## [Unreleased]` in `CHANGELOG.md` as you make it — do not
+reconstruct it later from the git log. On release, rename that heading to the version and date,
+bump `package.json`, and open a fresh `[Unreleased]`.
+
+Use the Keep a Changelog groups: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+Write entries for the person operating the app, not for the person who wrote the diff. Internal
+refactors with no visible effect do not belong there; a decisions-log row in `ARCHITECTURE.md`
+does.
+
+Anything that requires action after upgrading — a migration to run, a config change, a value that
+must be re-entered — must say so explicitly.
 
 ---
 

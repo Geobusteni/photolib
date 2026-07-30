@@ -56,15 +56,17 @@ interface GalleryProps {
   photos: PhotoData[]
   title: string
   projectId: string
-  zipEnabled: boolean
+  /** True only when the photographer uploaded an archive for this gallery. */
+  hasArchive: boolean
 }
 
-export default function Gallery({ photos, title, projectId, zipEnabled }: GalleryProps) {
+export default function Gallery({ photos, title, projectId, hasArchive }: GalleryProps) {
   const [state, dispatch] = useReducer(reducer, { mode: 'gallery' })
   const openedFrom = useRef<HTMLElement | null>(null)
 
   const lastIndex = photos.length - 1
   const selected = state.mode === 'selection' ? state.selected : null
+  const archiveUrl = hasArchive ? `/api/projects/${projectId}/download` : null
 
   const openViewer = useCallback((index: number) => {
     openedFrom.current = document.querySelector<HTMLElement>(
@@ -126,16 +128,14 @@ export default function Gallery({ photos, title, projectId, zipEnabled }: Galler
           break
         case 'z':
         case 'Z':
-          if (state.mode === 'gallery' && zipEnabled) {
-            window.location.href = `/api/projects/${projectId}/download`
-          }
+          if (state.mode === 'gallery' && archiveUrl) window.location.href = archiveUrl
           break
       }
     }
 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [state.mode, downloadSelected, zipEnabled, projectId])
+  }, [state.mode, downloadSelected, archiveUrl])
 
   return (
     <>
@@ -143,28 +143,31 @@ export default function Gallery({ photos, title, projectId, zipEnabled }: Galler
         title={title}
         mode={state.mode === 'selection' ? 'selection' : 'gallery'}
         selectedCount={selected?.size ?? 0}
-        zipEnabled={zipEnabled}
-        projectId={projectId}
+        archiveUrl={archiveUrl}
         onEnterSelection={() => dispatch({ type: 'ENTER_SELECTION' })}
         onExitSelection={() => dispatch({ type: 'EXIT_SELECTION' })}
         onDownloadSelected={downloadSelected}
       />
 
-      <main className="columns-2 gap-1 pt-14 sm:columns-3 lg:columns-4">
+      {/* The grid sits in an 80%-wide column so photos are never flush to the
+          viewport edges, with breathing room above and below. */}
+      <main className="mx-auto w-[90%] max-w-[1600px] pb-16 pt-24 sm:w-[80%]">
         <h1 className="sr-only">{title}</h1>
-        {photos.map((photo, index) => (
-          <div key={photo.id} className="mb-1 break-inside-avoid">
-            <ImageTile
-              photo={photo}
-              index={index}
-              total={photos.length}
-              mode={state.mode === 'selection' ? 'selection' : 'gallery'}
-              selected={selected?.has(photo.id) ?? false}
-              onOpen={openViewer}
-              onToggleSelect={(id) => dispatch({ type: 'TOGGLE_SELECT', id })}
-            />
-          </div>
-        ))}
+        <div className="columns-2 gap-2 sm:columns-3 lg:columns-4">
+          {photos.map((photo, index) => (
+            <div key={photo.id} className="mb-2 break-inside-avoid">
+              <ImageTile
+                photo={photo}
+                index={index}
+                total={photos.length}
+                mode={state.mode === 'selection' ? 'selection' : 'gallery'}
+                selected={selected?.has(photo.id) ?? false}
+                onOpen={openViewer}
+                onToggleSelect={(id) => dispatch({ type: 'TOGGLE_SELECT', id })}
+              />
+            </div>
+          ))}
+        </div>
       </main>
 
       {state.mode === 'viewer' && (

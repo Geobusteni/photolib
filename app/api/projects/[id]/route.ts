@@ -1,7 +1,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { countPhotos, deleteProject, getProject, updateProject } from '@/lib/projects'
 import { deleteProjectFiles } from '@/lib/storage'
-import bcrypt from 'bcryptjs'
+import { encryptSecret } from '@/lib/crypto'
 import type { UpdateProjectData } from '@/lib/projects'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -34,7 +34,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     // Switching to email access retires the shared password.
     if (body.accessType === 'EMAIL') updates.password = null
   }
-  if (body.password) updates.password = await bcrypt.hash(body.password, 12)
+  if (body.password) updates.password = encryptSecret(body.password)
 
   return Response.json(await updateProject(id, updates))
 }

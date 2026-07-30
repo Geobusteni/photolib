@@ -3,7 +3,6 @@
 interface ViewerControlsProps {
   currentIndex: number
   total: number
-  dlEnabled: boolean
   downloadUrl: string | null
   isFullscreen: boolean
   controlsVisible: boolean
@@ -16,7 +15,6 @@ interface ViewerControlsProps {
 export default function ViewerControls({
   currentIndex,
   total,
-  dlEnabled,
   downloadUrl,
   isFullscreen,
   controlsVisible,
@@ -32,17 +30,17 @@ export default function ViewerControls({
       {/* Top bar */}
       <div
         aria-hidden={!visible}
-        className={`absolute inset-x-0 top-0 flex h-14 items-center justify-between px-4 transition-opacity duration-200 [.reduce-motion_&]:transition-none ${
-          visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between bg-gradient-to-b from-black/60 to-transparent px-4 transition-opacity duration-200 [.reduce-motion_&]:transition-none ${
+          visible ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
         <span className="text-sm text-white/70">
           {currentIndex + 1} / {total}
         </span>
         <div className="flex items-center gap-1">
-          {dlEnabled && downloadUrl && (
+          {downloadUrl && (
             <a
-              href={`${downloadUrl}?download`}
+              href={downloadUrl}
               download
               aria-label="Download image"
               className={iconBtn}
@@ -97,7 +95,7 @@ const iconBtn =
   'flex h-11 w-11 items-center justify-center rounded-full text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors'
 
 const navBtn =
-  'absolute top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors transition-opacity duration-200 [.reduce-motion_&]:transition-none'
+  'absolute top-1/2 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-opacity duration-200 [.reduce-motion_&]:transition-none'
 
 function DownloadIcon() {
   return (

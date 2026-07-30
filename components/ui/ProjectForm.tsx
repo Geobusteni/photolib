@@ -167,7 +167,11 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
       </Field>
 
       <div className="flex flex-col gap-3">
-        <Toggle id="zipEnabled" label="Allow ZIP download" defaultChecked={defaults?.zipEnabled ?? true} />
+        <Toggle
+          id="zipEnabled"
+          label="Offer the uploaded archive for download"
+          defaultChecked={defaults?.zipEnabled ?? true}
+        />
         <Toggle
           id="dlEnabled"
           label="Allow individual image downloads"

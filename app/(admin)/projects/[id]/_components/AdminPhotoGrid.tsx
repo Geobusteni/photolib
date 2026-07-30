@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 interface PhotoRow {
   id: string
   filename: string
+  originalName: string
 }
 
 export default function AdminPhotoGrid({
@@ -41,10 +42,16 @@ export default function AdminPhotoGrid({
               loading="lazy"
               className="h-full w-full object-cover"
             />
+            <p
+              title={photo.originalName}
+              className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              {photo.originalName}
+            </p>
             <button
               onClick={() => handleDelete(photo.id)}
               disabled={deleting === photo.id}
-              aria-label={`Delete photo ${photo.filename}`}
+              aria-label={`Delete photo ${photo.originalName}`}
               className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-white opacity-0 transition-opacity focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white group-hover:opacity-100 disabled:opacity-50"
             >
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70">

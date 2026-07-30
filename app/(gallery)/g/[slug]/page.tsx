@@ -44,7 +44,7 @@ export default async function GalleryPage({ params }: Props) {
         photos={photos.map((p) => toPhotoData(p, project.dlEnabled))}
         title={project.title}
         projectId={slug}
-        zipEnabled={project.zipEnabled}
+        hasArchive={project.zipEnabled && !!project.archiveName}
       />
     </div>
   )

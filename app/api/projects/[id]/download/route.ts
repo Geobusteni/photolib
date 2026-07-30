@@ -1,54 +1,51 @@
 import { verifyGalleryAccess } from '@/lib/gallery-auth'
-import { getPhoto, getProject, incrementDownload, listPhotos } from '@/lib/projects'
-import { photosDir } from '@/lib/storage'
+import { getPhoto, getProject, incrementDownload } from '@/lib/projects'
+import { archivePath, photosDir } from '@/lib/storage'
 import path from 'path'
 import fs from 'fs/promises'
 import { zipSync } from 'fflate'
 
 type Ctx = { params: Promise<{ id: string }> }
 
-async function buildZip(filePaths: { src: string; name: string }[]): Promise<Uint8Array> {
-  const files: Record<string, Uint8Array> = {}
-  await Promise.all(
-    filePaths.map(async ({ src, name }) => {
-      files[name] = new Uint8Array(await fs.readFile(src))
-    })
-  )
-  return zipSync(files, { level: 1 })
+function attachmentName(name: string): string {
+  // Strip quotes and control characters that would break the header.
+  return name.replace(/["\r\n]/g, '').trim() || 'download.zip'
 }
 
-function zipResponse(data: Uint8Array, filename: string): Response {
-  const safeName = filename.replace(/[^a-zA-Z0-9-_ ]/g, '').trim() || 'photos'
-  return new Response(Buffer.from(data), {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${safeName}.zip"`,
-      'Content-Length': String(data.length),
-    },
-  })
-}
-
+/**
+ * The full archive is whatever the admin uploaded — it is never assembled from the
+ * photos. Only a client's own selection is zipped on the fly.
+ */
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params
   const project = await getProject(id)
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
-  if (!project.zipEnabled) {
-    return Response.json({ error: 'ZIP download disabled' }, { status: 403 })
+  if (!project.zipEnabled || !project.archiveName) {
+    return Response.json({ error: 'No archive is available for this gallery' }, { status: 404 })
   }
   if (!(await verifyGalleryAccess(id))) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const photos = await listPhotos(id)
-  const dir = photosDir(id)
-  const data = await buildZip(
-    photos.map((p) => ({ src: path.join(dir, p.filename), name: p.filename }))
-  )
+  let buffer: Buffer
+  try {
+    buffer = await fs.readFile(archivePath(id))
+  } catch {
+    return Response.json({ error: 'The archive file is missing' }, { status: 404 })
+  }
 
   await incrementDownload(id)
-  return zipResponse(data, project.title)
+
+  return new Response(new Uint8Array(buffer), {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${attachmentName(project.archiveName)}"`,
+      'Content-Length': String(buffer.length),
+    },
+  })
 }
 
+/** Zips exactly the photos the client selected, under their original names. */
 export async function POST(request: Request, ctx: Ctx) {
   const { id } = await ctx.params
   const project = await getProject(id)
@@ -63,19 +60,41 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const dir = photosDir(id)
-  const filePaths: { src: string; name: string }[] = []
+  const files: Record<string, Uint8Array> = {}
+  const used = new Set<string>()
 
   for (const photoId of body.photoIds as string[]) {
     const photo = await getPhoto(photoId)
     if (!photo || photo.projectId !== id) continue
-    filePaths.push({ src: path.join(dir, photo.filename), name: photo.filename })
+
+    // Two photos can share an original name only across projects, but guard anyway.
+    let entryName = photo.originalName
+    if (used.has(entryName)) {
+      const ext = path.extname(entryName)
+      entryName = `${path.basename(entryName, ext)}-${photo.id.slice(0, 6)}${ext}`
+    }
+    used.add(entryName)
+
+    try {
+      files[entryName] = new Uint8Array(await fs.readFile(path.join(dir, photo.filename)))
+    } catch {
+      // A missing file should not fail the whole download.
+      continue
+    }
   }
 
-  if (filePaths.length === 0) {
+  if (Object.keys(files).length === 0) {
     return Response.json({ error: 'No valid photos' }, { status: 400 })
   }
 
-  const data = await buildZip(filePaths)
+  const data = zipSync(files, { level: 1 })
   await incrementDownload(id)
-  return zipResponse(data, `${project.title}-selection`)
+
+  return new Response(new Uint8Array(data), {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${attachmentName(`${project.title}-selection.zip`)}"`,
+      'Content-Length': String(data.length),
+    },
+  })
 }

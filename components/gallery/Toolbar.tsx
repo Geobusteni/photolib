@@ -4,19 +4,21 @@ interface ToolbarProps {
   title: string
   mode: 'gallery' | 'selection'
   selectedCount: number
-  zipEnabled: boolean
-  projectId: string
+  /** Null unless the photographer uploaded an archive — nothing is generated. */
+  archiveUrl: string | null
   onEnterSelection: () => void
   onExitSelection: () => void
   onDownloadSelected: () => void
 }
 
+const buttonClass =
+  'inline-flex h-9 items-center justify-center rounded-lg px-3 text-center text-sm font-medium leading-none text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50'
+
 export default function Toolbar({
   title,
   mode,
   selectedCount,
-  zipEnabled,
-  projectId,
+  archiveUrl,
   onEnterSelection,
   onExitSelection,
   onDownloadSelected,
@@ -27,34 +29,24 @@ export default function Toolbar({
 
       {mode === 'gallery' ? (
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={onEnterSelection}
-            className="h-9 rounded-lg px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-          >
+          <button onClick={onEnterSelection} className={buttonClass}>
             Select
           </button>
-          {zipEnabled && (
-            <a
-              href={`/api/projects/${projectId}/download`}
-              download
-              className="h-9 rounded-lg px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-            >
+          {archiveUrl && (
+            <a href={archiveUrl} download className={buttonClass}>
               Download ZIP
             </a>
           )}
         </div>
       ) : (
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={onExitSelection}
-            className="h-9 rounded-lg px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-          >
+          <button onClick={onExitSelection} className={buttonClass}>
             Cancel
           </button>
           <button
             onClick={onDownloadSelected}
             disabled={selectedCount === 0}
-            className="h-9 rounded-lg bg-white px-3 text-sm font-medium text-black transition-colors hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-40"
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-white px-3 text-center text-sm font-medium leading-none text-black transition-colors hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-40"
           >
             Download{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </button>
