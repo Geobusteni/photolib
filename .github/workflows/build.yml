@@ -44,6 +44,9 @@ jobs:
           cp -r .next deploy/
           cp -r public deploy/
           cp -r prisma deploy/
+          cp -r lib deploy/
+          cp -r app deploy/
+          cp -r scripts deploy/
           cp package.json deploy/
           cp package-lock.json deploy/
           cp prisma.config.ts deploy/
