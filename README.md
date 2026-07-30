@@ -7,6 +7,17 @@ password or by their email address — where they can view and download delivere
 
 ---
 
+## Documentation
+
+- **[README.md](./README.md)** (this file) — Installation and development setup
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Production deployment guide
+- **[OPERATIONS.md](./OPERATIONS.md)** — Day-to-day operations (starting/stopping, logs, troubleshooting)
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — Technical architecture and design decisions
+- **[AGENTS.md](./AGENTS.md)** — AI agent development guidelines
+- **[CHANGELOG.md](./CHANGELOG.md)** — Version history and release notes
+
+---
+
 ## Stack
 
 - **Next.js 16** (App Router, React 19)

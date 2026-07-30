@@ -2,6 +2,11 @@
 
 This guide covers deploying Photolib to a production server with MySQL.
 
+> **📖 See also:**
+> - [README.md](./README.md) — Development setup
+> - [OPERATIONS.md](./OPERATIONS.md) — Managing the app in production (start/stop/logs)
+> - [ARCHITECTURE.md](./ARCHITECTURE.md) — Technical details
+
 ---
 
 ## Quick Start (Production)
