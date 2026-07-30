@@ -10,11 +10,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-mariadb": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "fflate": "^0.8.3",
     "iron-session": "^8.0.4",
+    "mariadb": "^3.5.3",
     "next": "16.2.12",
     "prisma": "^7.9.1",
     "react": "19.2.4",
