@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Alexandru Negoita
+
+name: Build and Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          # Next.js build might need DATABASE_URL if there are static pages 
+          # but here they are dynamic. Architecture says force-dynamic for admin.
+          # We'll use a dummy one just in case Prisma requires it during build.
+          DATABASE_URL: "mysql://localhost:3306/dummy"
+
+      - name: Prepare deployment package
+        run: |
+          mkdir deploy
+          cp -r .next deploy/
+          cp -r public deploy/
+          cp -r prisma deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cp .env.example deploy/
+          
+          # Install only production dependencies in the deploy folder
+          cd deploy
+          npm ci --omit=dev
+          # Regenerate prisma client for the production node_modules
+          npx prisma generate
+          cd ..
+
+      - name: Create artifact
+        run: tar -czf photolib-deploy.tar.gz -C deploy .
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: photolib-deploy
+          path: photolib-deploy.tar.gz
+          retention-days: 5

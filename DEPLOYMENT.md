@@ -4,25 +4,19 @@ This guide covers deploying Photolib to a production server with MySQL.
 
 ---
 
-## Quick Start
+## Quick Start (Production)
 
 ```bash
-# 1. Create MySQL database in hosting panel (RunCloud, cPanel, etc.)
-# 2. Clone repository
-git clone https://github.com/yourusername/photolib.git
-cd photolib
+# 1. Prepare environment on server
+sudo mkdir -p /var/www/photolib && cd /var/www/photolib
+gh auth login
 
-# 3. Configure environment
-cp .env.example .env
-nano .env  # Set DATABASE_URL, SESSION_SECRET, UPLOAD_DIR
+# 2. Get the update script (or download manually)
+# Then run it to pull the latest artifact
+./scripts/update-from-github.sh
 
-# 4. Deploy
-./scripts/deploy-server.sh
-
-# 5. Start with PM2
-npm install -g pm2
-pm2 start npm --name photolib -- start
-pm2 save
+# 3. Edit .env with your credentials
+nano .env
 ```
 
 ---
@@ -40,9 +34,59 @@ pm2 save
 - MySQL database (create via hosting panel)
 - Domain name configured to point to your server
 
+## Development vs Production
+
+Photolib distinguishes between **Development** (where you write code) and **Production** (where clients view photos).
+
+| Feature | Development Server | Production Server |
+|---------|-------------------|-------------------|
+| **Code** | Full Git repository clone | Build artifacts only (no `.git`, no source TS files) |
+| **Dependencies** | All (`npm install`) | Production only (`npm install --omit=dev`) |
+| **Build Process** | Done locally or by GitHub | Never build on production (OOM risk) |
+| **Update Method** | `git pull` | Download & unpack `photolib-deploy.tar.gz` |
+
 ---
 
-## Step-by-Step Deployment
+## Production Deployment (Recommended)
+
+On production, you do **not** need to clone the repository. You only need the pre-built artifact.
+
+### 1. Initial Server Setup
+
+Perform these steps once on your clean Ubuntu server:
+
+```bash
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs gh
+
+# Create app directory
+sudo mkdir -p /var/www/photolib
+sudo chown $USER:$USER /var/www/photolib
+cd /var/www/photolib
+
+# Authenticate with GitHub (needed to download private artifacts)
+gh auth login
+```
+
+### 2. Deploy / Update
+
+Instead of `git pull`, use the update script to grab the latest build from GitHub Actions:
+
+```bash
+# Get the script (change REPO to your repository)
+curl -fsSL https://raw.githubusercontent.com/yourusername/photolib/main/scripts/update-from-github.sh -o scripts/update-from-github.sh
+chmod +x scripts/update-from-github.sh
+
+# Run it to update
+./scripts/update-from-github.sh
+```
+
+> **Note:** Edit `scripts/update-from-github.sh` to set your `REPO` name.
+
+---
+
+### 3. Step-by-Step Manual Deployment (Alternative)
 
 ### 1. Prepare MySQL Database
 
@@ -82,7 +126,7 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-### 3. Clone Repository
+### 3.3 Clone Repository (Development only)
 
 ```bash
 # Clone to your web app directory
@@ -115,16 +159,12 @@ Creates database tables, builds app, sets up uploads directory.
 
 ### 6. Start Application
 
-**With PM2:**
-```bash
-npm install -g pm2
-pm2 start npm --name photolib -- start
-pm2 save
-pm2 startup
-```
+You have two main options for keeping the application running in the background. Since you are on Ubuntu, **systemd** is the recommended minimalist approach, but **PM2** is also supported.
 
-**With systemd:**
+#### Option A: systemd (Recommended for Ubuntu)
+
 Create `/etc/systemd/system/photolib.service`:
+
 ```ini
 [Unit]
 Description=Photolib
@@ -133,18 +173,35 @@ After=network.target mysql.service
 [Service]
 Type=simple
 User=your-user
+Group=your-user
 WorkingDirectory=/path/to/photolib
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/npm start
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Enable and start the service:
+
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl enable photolib
 sudo systemctl start photolib
+sudo systemctl status photolib
+```
+
+#### Option B: PM2
+
+If you prefer PM2:
+
+```bash
+npm install -g pm2
+pm2 start npm --name photolib -- start
+pm2 save
+pm2 startup
 ```
 
 ### 7. Configure Nginx Proxy

@@ -10,7 +10,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- GitHub Actions workflow for automated production builds and packaging
+- `scripts/sync-server.sh` for pushing builds from local to remote
+- `scripts/update-from-github.sh` for pulling latest artifacts directly on production
+- Production-only deployment model (no Git clone required on server)
+- `curl` command for easy script retrieval in `DEPLOYMENT.md`
+- systemd service configuration instructions in `DEPLOYMENT.md`
 
 ---
 
