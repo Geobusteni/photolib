@@ -40,7 +40,8 @@ yarn-error.log*
 
 # env — single config file, never commit
 .env
-# .env.example is committed as a documentation template
+.env.backup
+# .env.example and .env.docker are committed as documentation templates
 
 # vercel
 .vercel

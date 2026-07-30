@@ -1,6 +1,6 @@
 # Photolib
 
-**Version 0.1.0** — first beta. See [`CHANGELOG.md`](./CHANGELOG.md).
+**Version 0.1.1** — See [`CHANGELOG.md`](./CHANGELOG.md) for details.
 
 A private photography delivery application. Clients receive a gallery — gated by a shared
 password or by their email address — where they can view and download delivered photographs.
@@ -220,7 +220,7 @@ Sign in at `/login`. From **Projects** you can:
 - Watch visit count, download count, and last access
 - Delete the project and all its files
 
-Share the gallery URL shown on the project page: `/g/[project-id]`.
+Share the gallery URL shown on the project page: `https://yourdomain.com/g/[project-id]`.
 
 #### Filenames and duplicates
 

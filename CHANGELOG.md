@@ -14,6 +14,33 @@ Nothing yet.
 
 ---
 
+## [0.1.1] — 2026-07-30
+
+### Added
+
+**Deployment**
+
+- Docker support with multi-stage Dockerfile for optimized production builds
+- Docker Compose configuration with PostgreSQL 16 and automatic health checks
+- Automated deployment scripts: `docker-deploy.sh` for initial setup, `docker-update.sh` for updates
+- Build scripts for traditional deployments: `build-for-deploy.sh` and `update-server.sh`
+- Health check endpoint at `/api/health` for container monitoring
+- Comprehensive deployment documentation covering Docker, standard VPS, and local build options
+- RunCloud-specific integration guide with reverse proxy configuration
+- Docker-specific quick reference guide (`README-DOCKER.md`)
+
+**Configuration**
+
+- `.env.docker` template for Docker deployments
+- `.dockerignore` for optimized Docker image builds
+
+### Changed
+
+- Documentation now clarifies production access via domain (not port) for reverse proxy setups
+- Updated all deployment docs to support multiple deployment strategies
+
+---
+
 ## [0.1.0] — 2026-07-30
 
 First beta. A complete, self-hosted photography delivery application.
