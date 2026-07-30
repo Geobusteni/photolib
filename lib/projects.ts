@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Alexandru Negoita
 
 import prisma from './prisma'
-import type { AccessType } from './generated/prisma/enums'
+import type { AccessType } from './generated/prisma/client'
 
 export type { AccessType }
 

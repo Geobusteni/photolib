@@ -5,7 +5,7 @@ import { getIronSession, IronSession } from 'iron-session'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
-import type { Role } from './generated/prisma/enums'
+import type { Role } from './generated/prisma/client'
 
 export interface SessionData {
   userId: string

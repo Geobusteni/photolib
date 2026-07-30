@@ -3,7 +3,7 @@
 
 import prisma from './prisma'
 import { hashPassword } from './auth'
-import type { Role } from './generated/prisma/enums'
+import type { Role } from './generated/prisma/client'
 
 export type { Role }
 

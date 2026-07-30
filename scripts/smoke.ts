@@ -9,7 +9,7 @@
  *   npx tsx scripts/smoke.ts
  */
 import { PrismaClient } from '../lib/generated/prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import bcrypt from 'bcryptjs'
 import { zipSync } from 'fflate'
 import sharp from 'sharp'
@@ -55,7 +55,7 @@ async function jpeg(text: string) {
 
 async function main() {
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+    adapter: new PrismaMariaDb(process.env.DATABASE_URL!),
   })
 
   const admin = await prisma.user.create({
