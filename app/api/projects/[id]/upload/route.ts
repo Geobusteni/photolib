@@ -1,6 +1,6 @@
 import { requireAdmin } from '@/lib/auth'
 import { getProject, insertPhoto } from '@/lib/projects'
-import { ensureProjectDirs, photosDir } from '@/lib/storage'
+import { deletePhotoFiles, ensureProjectDirs, photosDir } from '@/lib/storage'
 import { generateThumbs } from '@/lib/images'
 import path from 'path'
 import fs from 'fs/promises'
@@ -20,20 +20,17 @@ function isJpegBuffer(buffer: Buffer): boolean {
 async function processJpeg(projectId: string, buffer: Buffer): Promise<void> {
   if (!isJpegBuffer(buffer)) return
 
-  const photoId = crypto.randomUUID()
-  const filename = `${photoId}.jpg`
+  const filename = `${crypto.randomUUID()}.jpg`
   await fs.writeFile(path.join(photosDir(projectId), filename), buffer)
 
-  const { width, height } = await generateThumbs(projectId, filename)
-
-  await insertPhoto({
-    projectId,
-    filename,
-    width,
-    height,
-    size: buffer.length,
-    sortOrder: Date.now(),
-  })
+  try {
+    const { width, height } = await generateThumbs(projectId, filename)
+    await insertPhoto({ projectId, filename, width, height, size: buffer.length })
+  } catch (error) {
+    // Never leave files on disk that no database row points at.
+    await deletePhotoFiles(projectId, filename)
+    throw error
+  }
 }
 
 export async function POST(request: Request, ctx: Ctx) {
@@ -56,22 +53,33 @@ export async function POST(request: Request, ctx: Ctx) {
     file.type === 'application/x-zip-compressed' ||
     ext === '.zip'
 
-  if (ALLOWED_MIME.has(file.type) || JPEG_EXTS.has(ext)) {
-    if (!isJpegBuffer(buffer)) {
-      return Response.json({ error: 'File is not a valid JPEG' }, { status: 400 })
+  try {
+    if (ALLOWED_MIME.has(file.type) || JPEG_EXTS.has(ext)) {
+      if (!isJpegBuffer(buffer)) {
+        return Response.json({ error: 'File is not a valid JPEG' }, { status: 400 })
+      }
+      await processJpeg(id, buffer)
+      return Response.json({ ok: true, added: 1 })
     }
-    await processJpeg(id, buffer)
-    return Response.json({ ok: true })
-  }
 
-  if (isZip) {
-    const unzipped = unzipSync(new Uint8Array(buffer))
-    for (const [entryPath, data] of Object.entries(unzipped)) {
-      if (!JPEG_EXTS.has(path.extname(entryPath).toLowerCase())) continue
-      if (entryPath.startsWith('__MACOSX')) continue
-      await processJpeg(id, Buffer.from(data))
+    if (isZip) {
+      const unzipped = unzipSync(new Uint8Array(buffer))
+      let added = 0
+      for (const [entryPath, data] of Object.entries(unzipped)) {
+        if (!JPEG_EXTS.has(path.extname(entryPath).toLowerCase())) continue
+        if (entryPath.startsWith('__MACOSX')) continue
+        await processJpeg(id, Buffer.from(data))
+        added++
+      }
+      if (added === 0) {
+        return Response.json({ error: 'No JPEG images found in the archive' }, { status: 400 })
+      }
+      return Response.json({ ok: true, added })
     }
-    return Response.json({ ok: true })
+  } catch (error) {
+    console.error('[upload] failed:', error)
+    const message = error instanceof Error ? error.message : 'Upload failed'
+    return Response.json({ error: message }, { status: 500 })
   }
 
   return Response.json(

@@ -84,9 +84,18 @@ export async function insertPhoto(data: {
   width: number
   height: number
   size: number
-  sortOrder: number
 }) {
-  return prisma.photo.create({ data })
+  // sortOrder must stay within a 32-bit signed INTEGER, so it counts up from the
+  // current maximum rather than using a timestamp.
+  const last = await prisma.photo.findFirst({
+    where: { projectId: data.projectId },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  })
+
+  return prisma.photo.create({
+    data: { ...data, sortOrder: (last?.sortOrder ?? -1) + 1 },
+  })
 }
 
 export async function deletePhoto(id: string) {

@@ -53,15 +53,50 @@ sudo apt install postgresql
 sudo systemctl start postgresql
 ```
 
-### 3. Create the database
+### 3. Create the database and its user
 
-Skip this if you used the Docker command above, which creates it for you.
+Skip this entirely if you used the Docker command above — it creates the user and database
+for you.
+
+Create the **role first**, then create the database **owned by that role**:
 
 ```bash
-createdb photolib
-createuser photolib --pwprompt
-psql -c "GRANT ALL PRIVILEGES ON DATABASE photolib TO photolib;"
+createuser photolib --pwprompt      # prompts for a password
+createdb -O photolib photolib       # -O sets photolib as the owner
 ```
+
+That is the whole setup. Because `photolib` owns the database, it already has every privilege
+on it and no `GRANT` is needed.
+
+> **Why not `createdb photolib` followed by a `GRANT`?**
+>
+> Two things go wrong. First, a bare `psql -c "..."` connects to a database named after your
+> operating system user, which does not exist on a fresh Homebrew install:
+>
+> ```
+> psql: error: FATAL:  database "alex" does not exist
+> ```
+>
+> You would need `psql -d postgres -c "..."` to give it a database that does exist. Second,
+> on PostgreSQL 15 and newer, `GRANT ALL PRIVILEGES ON DATABASE` is not sufficient anyway —
+> it does not grant rights on the `public` schema, so Prisma still fails to create tables.
+> Making the role the owner with `-O` sidesteps both problems.
+
+If you already created the database the wrong way, fix the ownership rather than granting:
+
+```bash
+psql -d postgres -c "ALTER DATABASE photolib OWNER TO photolib;"
+psql -d photolib -c "ALTER SCHEMA public OWNER TO photolib;"
+```
+
+Verify it worked:
+
+```bash
+psql -d postgres -l          # list databases and their owners
+psql -d postgres -c "\du"    # list roles
+```
+
+You should see `photolib` listed as the owner of the `photolib` database.
 
 ### 4. Install dependencies
 
@@ -100,6 +135,116 @@ UPLOAD_DIR=./uploads
 
 > **Use single quotes.** Values containing `$` — bcrypt hashes, some database passwords — are
 > otherwise read as variable references and silently truncated.
+
+---
+
+## Finding your DATABASE_URL
+
+The connection string always follows this shape:
+
+```
+postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+```
+
+| Part       | Meaning                          | Typical local value |
+|------------|----------------------------------|---------------------|
+| `USER`     | PostgreSQL role name             | `photolib`          |
+| `PASSWORD` | That role's password             | whatever you set    |
+| `HOST`     | Server address                   | `localhost`         |
+| `PORT`     | Server port                      | `5432`              |
+| `DATABASE` | Database name                    | `photolib`          |
+
+Following the setup above, that gives:
+
+```
+DATABASE_URL='postgresql://photolib:yourpassword@localhost:5432/photolib'
+```
+
+### If you are unsure of the values
+
+**Which port is PostgreSQL on?**
+
+```bash
+psql -d postgres -c "SHOW port;"
+```
+
+Homebrew uses `5432` by default. A second installed version often uses `5433`.
+
+**Which databases and roles exist?**
+
+```bash
+psql -d postgres -l          # databases, with owners
+psql -d postgres -c "\du"    # roles
+```
+
+**What is the full connection string of a live session?**
+
+Connect and ask:
+
+```bash
+psql -d photolib -c "\conninfo"
+```
+
+```
+You are connected to database "photolib" as user "photolib"
+on host "localhost" (address "127.0.0.1") at port "5432".
+```
+
+### Common variations
+
+**Docker** — matches the `-e` values and the host-side port you published:
+
+```
+DATABASE_URL='postgresql://photolib:yourpassword@localhost:5432/photolib'
+```
+
+**Your macOS user as a superuser** (Homebrew creates one named after you, with no password):
+
+```
+DATABASE_URL='postgresql://alex@localhost:5432/photolib'
+```
+
+**Unix socket instead of TCP** — no host, pointing at the socket directory:
+
+```
+DATABASE_URL='postgresql://photolib:yourpassword@localhost/photolib?host=/tmp'
+```
+
+**Hosted provider** (Neon, Supabase, Railway, RDS) — copy the string from their dashboard.
+Most require TLS:
+
+```
+DATABASE_URL='postgresql://user:pass@db.example.com:5432/photolib?sslmode=require'
+```
+
+### Special characters in the password
+
+The password sits inside a URL, so characters like `@`, `/`, `:`, `#`, and `?` must be
+percent-encoded or they will break parsing. `p@ss/word` becomes `p%40ss%2Fword`.
+
+Encode one safely:
+
+```bash
+node -e "console.log(encodeURIComponent('p@ss/word'))"
+```
+
+Avoiding punctuation in the database password is the simpler path.
+
+### Check the string actually works
+
+```bash
+psql "postgresql://photolib:yourpassword@localhost:5432/photolib" -c "SELECT 1;"
+```
+
+A `1` back means Prisma will connect too. Common failures:
+
+| Message                               | Cause                                             |
+|---------------------------------------|---------------------------------------------------|
+| `database "alex" does not exist`      | No database given; add `-d postgres` or a full URL |
+| `role "photolib" does not exist`      | The role was never created — run `createuser`      |
+| `password authentication failed`      | Wrong password, or it needs percent-encoding       |
+| `Connection refused`                  | Server not running, or the wrong port              |
+| `permission denied for schema public` | The role does not own the database — see step 3    |
 
 ### 6. Create the database tables
 

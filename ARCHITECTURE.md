@@ -336,6 +336,8 @@ That constraint lives in the reducer rather than in scattered conditionals.
 | Iron Session over NextAuth        | No OAuth needed; sessions are two small signed cookies        |
 | Guests without passwords          | The photographer often has an email but no account to create  |
 | UUID filenames on disk            | Avoids traversal, encoding, and collision issues entirely     |
+| `sortOrder` counts up from max    | Prisma `Int` is a 32-bit PostgreSQL `INTEGER`; `Date.now()` overflows it |
+| Upload deletes files on failure   | A failed insert used to leave orphaned files on disk          |
 | fflate over archiver              | Pure ESM, no CJS interop problems; handles both zip and unzip |
 | `useReducer` over a state library | One screen of state; a library would be pure overhead         |
 | Pointer Events for gestures       | Native browser API, no dependency                             |
