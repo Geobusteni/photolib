@@ -8,6 +8,12 @@ set -e
 REPO="Geobusteni/photolib"
 ARTIFACT_NAME="photolib-deploy"
 PACKAGE_FILE="photolib-deploy.tar.gz"
+FORCE_UPDATE=false
+
+# Parse arguments
+if [ "$1" = "--force" ]; then
+    FORCE_UPDATE=true
+fi
 
 echo "📥 Photolib Production Update Script"
 
@@ -35,6 +41,21 @@ fi
 if [ -z "$RUN_ID" ]; then
     echo "❌ Error: No successful build runs found in $REPO"
     exit 1
+fi
+
+# Check if this version is already deployed
+DEPLOYED_VERSION_FILE=".deployed-version"
+if [ "$FORCE_UPDATE" = false ] && [ -f "$DEPLOYED_VERSION_FILE" ]; then
+    DEPLOYED_RUN_ID=$(cat "$DEPLOYED_VERSION_FILE")
+    if [ "$DEPLOYED_RUN_ID" = "$RUN_ID" ]; then
+        echo "✅ Already running latest version (build $RUN_ID)"
+        echo "   Use --force to re-download and re-deploy anyway."
+        exit 0
+    fi
+    echo "📌 Current version: build $DEPLOYED_RUN_ID"
+    echo "📌 Latest version:  build $RUN_ID"
+elif [ "$FORCE_UPDATE" = true ]; then
+    echo "🔨 Force update requested, skipping version check..."
 fi
 
 echo "📥 Downloading artifact from run $RUN_ID..."
@@ -97,6 +118,10 @@ elif command -v pm2 &> /dev/null && pm2 describe photolib &> /dev/null; then
 else
     echo "⚠️  Could not automatically restart service. Please restart it manually."
 fi
+
+# Save deployed version
+echo "$RUN_ID" > "$DEPLOYED_VERSION_FILE"
+echo "💾 Saved deployed version: $RUN_ID"
 
 echo ""
 echo "✅ Update complete!"

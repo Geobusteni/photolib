@@ -43,6 +43,9 @@ yarn-error.log*
 .env.backup
 # .env.example and .env.docker are committed as documentation templates
 
+# deployment tracking
+.deployed-version
+
 # vercel
 .vercel
 
