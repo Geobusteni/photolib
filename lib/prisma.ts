@@ -11,6 +11,9 @@ function createClient(): PrismaClient {
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set. Copy .env.example to .env and configure it.')
   }
+
+  // During Docker build, we use a placeholder connection string
+  // The actual connection is made at runtime with the real DATABASE_URL
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 }
 

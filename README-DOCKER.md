@@ -29,9 +29,11 @@ nano .env
 ```
 
 Set these values:
-- `DB_PASSWORD` - Secure password for PostgreSQL
+- `DB_PASSWORD` - Secure password for PostgreSQL (Docker will create the database with this password)
 - `SESSION_SECRET` - Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 - `PORT` - Port to expose (default: 3000)
+
+> **Note:** You don't need to install PostgreSQL or create any databases manually. Docker Compose creates and manages the PostgreSQL container automatically with the password you specify.
 
 ### 3. Deploy
 

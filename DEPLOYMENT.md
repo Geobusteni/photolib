@@ -57,12 +57,37 @@ sudo usermod -aG docker $USER
 # Log out and back in for group changes to take effect
 ```
 
+**RunCloud / Containerized Web App Users:**
+
+If Docker was installed by root and your web app runs under a different user (e.g., `runcloud`, `webapp-user`), you must add that user to the docker group:
+
+```bash
+# Add the web app user to docker group
+sudo usermod -aG docker runcloud  # Replace 'runcloud' with your actual user
+
+# Verify the user is in the group
+groups runcloud
+
+# Apply group changes (choose one):
+# Option 1: Log out and back in
+# Option 2: Run this in your current shell
+newgrp docker
+
+# Option 3: Use su to switch to the user (most reliable for RunCloud)
+su - runcloud
+```
+
 **Verify installation:**
 
 ```bash
 docker --version
 docker compose version
+
+# Test you can run docker without sudo
+docker ps
 ```
+
+If `docker ps` gives a permission error, the user is not in the docker group yet. Log out and back in, or contact your hosting provider.
 
 #### 3. Clone Repository
 
@@ -89,9 +114,11 @@ nano .env
 ```
 
 Set in `.env`:
-- `DB_PASSWORD=your-secure-database-password`
+- `DB_PASSWORD=your-secure-database-password` (Docker will create the PostgreSQL database with this password)
 - `SESSION_SECRET=<64-random-hex-characters-from-above>`
 - `PORT=3000` (or your preferred port)
+
+> **Important:** You do NOT need to install PostgreSQL or create the database manually. Docker Compose handles all of this automatically. The database runs in its own container with the password you set in `.env`.
 
 #### 5. Deploy
 
@@ -100,11 +127,14 @@ Set in `.env`:
 ```
 
 This will:
-- Build Docker images
-- Start PostgreSQL database
-- Run migrations
-- Start the application
-- Set up health checks
+- Build Docker images (app is built with a standalone output)
+- Start PostgreSQL 16 database container (automatically created with your DB_PASSWORD)
+- Create the `photolib` database and `photolib` user
+- Run database migrations
+- Start the application container
+- Set up health checks for both containers
+
+> **Behind the scenes:** Docker Compose automatically installs PostgreSQL 16 in a separate container, creates the database, sets up the user with your password, and connects everything together. You never touch PostgreSQL directly.
 
 #### 6. Set Up Reverse Proxy (RunCloud)
 
@@ -599,6 +629,24 @@ psql -U photolib_user photolib_db -c "SELECT COUNT(*) FROM \"Project\";"
 ## Troubleshooting
 
 ### Docker Issues
+
+**Permission denied / Cannot connect to Docker daemon:**
+
+```bash
+# Check if your user is in the docker group
+groups
+
+# If 'docker' is not in the list, add it:
+sudo usermod -aG docker $USER
+
+# Apply changes (choose one):
+su - $USER              # Switch to your user (most reliable)
+newgrp docker           # Or activate group in current shell
+# Or log out and back in
+
+# Test
+docker ps
+```
 
 **Container won't start:**
 
