@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 const attempts = new Map<string, { count: number; resetAt: number }>()
 
 const WINDOW_MS = 60_000

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { cookies } from 'next/headers'
 import { getIronSession } from 'iron-session'
 import { getSession } from './auth'

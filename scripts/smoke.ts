@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 /**
  * End-to-end smoke test against a running dev server.
  * Creates a throwaway admin and project, exercises the upload/download paths,

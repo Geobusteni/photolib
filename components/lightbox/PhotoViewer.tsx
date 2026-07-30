@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

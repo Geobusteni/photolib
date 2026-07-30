@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { requireAdmin } from '@/lib/auth'
 import { countPhotos, deleteProject, getProject, updateProject } from '@/lib/projects'
 import { deleteProjectFiles } from '@/lib/storage'

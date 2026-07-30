@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import prisma from './prisma'
 import { hashPassword } from './auth'
 import type { Role } from './generated/prisma/enums'

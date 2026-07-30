@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import ProjectForm from '@/components/ui/ProjectForm'
 
 export const metadata = { title: 'New project' }

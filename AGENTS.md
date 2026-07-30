@@ -347,6 +347,25 @@ explaining why — including the ones that came from a bug, so nobody reverts th
 
 ---
 
+## Licensing
+
+Photolib is **GPL-3.0-or-later**. The full text is in `LICENSE` and must not be edited.
+
+Every authored source file starts with:
+
+```ts
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+```
+
+Add it to new files. `node scripts/add-license-headers.mjs` is idempotent and fills in anything
+missed; generated code under `lib/generated/` is excluded and must stay that way.
+
+New dependencies must carry a GPL-compatible license. Permissive licenses (MIT, BSD, Apache-2.0,
+ISC) are fine. Anything copyleft-incompatible or proprietary is not.
+
+---
+
 ## Versioning
 
 Semantic versioning, with `package.json` as the single source of truth. Current release: `0.1.0`.

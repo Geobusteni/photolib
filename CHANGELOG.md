@@ -49,6 +49,7 @@ First beta. A complete, self-hosted photography delivery application.
 
 **Platform**
 
+- Released under the GNU General Public License v3.0 or later
 - Next.js 16 App Router on React 19, TypeScript, Tailwind CSS 4
 - PostgreSQL via Prisma 7 with the `@prisma/adapter-pg` driver adapter
 - Iron Session cookie auth; bcrypt for account passwords

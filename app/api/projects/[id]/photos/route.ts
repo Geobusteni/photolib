@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { verifyGalleryAccess } from '@/lib/gallery-auth'
 import { getProject, listPhotos } from '@/lib/projects'
 import { toPhotoData } from '@/lib/photo-data'

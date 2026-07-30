@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getProject, incrementVisit, listPhotos } from '@/lib/projects'

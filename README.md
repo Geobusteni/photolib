@@ -313,3 +313,19 @@ npm run lint               # lint
 Photolib targets WCAG 2.1 AA. It is fully keyboard-navigable and respects
 `prefers-reduced-motion`; all animation is CSS-only and collapses to zero duration when motion
 is reduced.
+
+---
+
+## License
+
+Copyright (C) 2026 Alexandru Negoita.
+
+Photolib is free software: you can redistribute it and/or modify it under the terms of the
+**GNU General Public License, version 3 or later**, as published by the Free Software Foundation.
+
+It is distributed in the hope that it will be useful, but **without any warranty** — without even
+the implied warranty of merchantability or fitness for a particular purpose. See
+[`LICENSE`](./LICENSE) for the full text, or <https://www.gnu.org/licenses/gpl-3.0.html>.
+
+If you deploy a modified version, the GPL requires you to make your changes available under the
+same license to anyone you distribute it to.

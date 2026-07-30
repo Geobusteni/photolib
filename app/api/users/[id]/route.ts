@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { requireAdmin } from '@/lib/auth'
 import { countAdmins, deleteUser, getUser, toPublicUser, updateUser } from '@/lib/users'
 import type { Role } from '@/lib/users'

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { setupRequired } from '@/lib/users'

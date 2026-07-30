@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Alexandru Negoita
+
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import './globals.css'
