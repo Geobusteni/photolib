@@ -1,36 +1,148 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Photolib
 
-## Getting Started
+A private photography delivery application. Clients receive a password-protected gallery where they can view and download delivered photographs.
 
-First, run the development server:
+---
+
+## Stack
+
+- **Next.js 16** (App Router, React 19)
+- **TypeScript 5**
+- **Tailwind CSS 4**
+- **SQLite** via `better-sqlite3`
+- **Iron Session** for cookie-based auth
+- **Sharp** for server-side thumbnail generation
+- **fflate** for ZIP creation and extraction
+
+---
+
+## Getting started
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+Copy `.env.example` to `.env.local` and fill in values:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable              | Description                              |
+|-----------------------|------------------------------------------|
+| `ADMIN_USERNAME`      | Admin login username                     |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password        |
+| `SESSION_SECRET`      | 32+ random characters for session signing|
+| `UPLOAD_DIR`          | Path to store uploaded files (default: `./uploads`) |
+
+Generate a password hash:
+
+```bash
+node -e "require('bcryptjs').hash('yourpassword', 12).then(console.log)"
+```
+
+Generate a session secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 3. Run in development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 4. Build for production
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+### Admin
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Visit `/login` to sign in with your admin credentials.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+From the **Projects** dashboard you can:
+- Create a new project (title, event date, gallery password, expiration, download toggles)
+- Upload JPEG photos or a ZIP archive
+- View visit count, download count, and last access per project
+- Edit project settings or delete the project
 
-## Deploy on Vercel
+Each project has a unique URL at `/g/[project-id]` to share with clients.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Client gallery
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Clients visit the gallery URL and enter the password you set.
+
+- **Normal mode** — tap any photo to open the full-screen viewer
+- **Selection mode** — tap "Select" to enter; tap photos to select them; download selected as ZIP
+- **Lightbox (mobile)** — swipe left/right to navigate, swipe down to close, swipe up for actions
+- **Lightbox (desktop)** — arrow keys navigate; `F` toggles fullscreen; `Escape` closes
+- Download the full ZIP archive if enabled
+
+### Keyboard shortcuts
+
+**Gallery**
+
+| Key      | Action               |
+|----------|----------------------|
+| `S`      | Toggle selection mode |
+| `Escape` | Cancel selection     |
+| `D`      | Download selected    |
+| `Z`      | Download ZIP         |
+
+**Lightbox**
+
+| Key       | Action           |
+|-----------|------------------|
+| `←` / `→` | Previous / Next  |
+| `Escape`  | Close            |
+| `F`       | Toggle fullscreen|
+| `D`       | Download image   |
+| `Home`    | First image      |
+| `End`     | Last image       |
+
+---
+
+## File structure
+
+```
+uploads/
+  [project-id]/
+    photos/      original JPEGs
+    thumbs/      generated thumbnails (sm: 400px, lg: 1200px)
+    archive/     (reserved)
+photolib.db      SQLite database
+```
+
+Both `uploads/` and `photolib.db` are gitignored and must be backed up separately in production.
+
+---
+
+## Architecture
+
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full technical breakdown including the database schema, API routes, component hierarchy, and state model.
+
+For the build plan and development phases, see [`PLAN.md`](./PLAN.md).
+
+---
+
+## AI agent guidance
+
+See [`AGENTS.md`](./AGENTS.md) for project philosophy, feature scope, and coding conventions that all contributors (human and AI) must follow.
+
+---
+
+## Accessibility
+
+Photolib targets WCAG 2.1 AA. It is fully keyboard-navigable and respects `prefers-reduced-motion`. All animations are CSS-only and degrade gracefully to 0ms when motion is reduced.

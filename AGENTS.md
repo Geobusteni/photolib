@@ -8,7 +8,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Photolib – AI Agent Instructions
 
-Read `ARCHITECTURE.md` next. It describes the full technical structure.
+Read these files in order before writing any code:
+
+1. `ARCHITECTURE.md` — technical structure, stack, schema, and conventions
+2. `PLAN.md` — phased build plan; start at the first incomplete phase
 
 ---
 
@@ -205,6 +208,20 @@ The current state determines available actions.
 - [ ] WCAG 2.1 AA
 
 Accessibility failures are bugs.
+
+---
+
+## README Maintenance
+
+**Every time the project changes**, check `README.md` and update it if any of the following are affected:
+
+- Getting started steps (new env vars, new setup commands)
+- Usage instructions (new features, changed UI flows)
+- Keyboard shortcuts (added or removed)
+- File structure (new directories or conventions)
+- Stack (new or removed dependencies)
+
+The README is the first thing a new person reads. Keep it accurate.
 
 ---
 
