@@ -10,6 +10,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 
 ## [Unreleased]
 
+### Fixed
+
+- Compatibility with older GitHub CLI versions in `update-from-github.sh` (fixes `--status` flag error)
+
 ### Added
 
 - GitHub Actions workflow for automated production builds and packaging

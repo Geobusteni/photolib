@@ -82,7 +82,7 @@ chmod +x scripts/update-from-github.sh
 ./scripts/update-from-github.sh
 ```
 
-> **Note:** Edit `scripts/update-from-github.sh` to set your `REPO` name.
+> **Note:** Right now the repo name in the script is Geobusteni. Edit `scripts/update-from-github.sh` to set your `REPO` name.
 
 ---
 

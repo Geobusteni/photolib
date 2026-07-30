@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-REPO="yourusername/photolib"
+REPO="Geobusteni/photolib"
 ARTIFACT_NAME="photolib-deploy"
 PACKAGE_FILE="photolib-deploy.tar.gz"
 
@@ -26,8 +26,11 @@ if ! gh auth status &> /dev/null; then
     exit 1
 fi
 
-echo "🔍 Finding latest artifact..."
-RUN_ID=$(gh run list --repo "$REPO" --workflow "Build and Package" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+echo "🔍 Finding latest successful build..."
+# We try to use --status success, but if it fails (older gh versions), we fallback to filtering with jq
+if ! RUN_ID=$(gh run list --repo "$REPO" --workflow "Build and Package" --status success --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null); then
+    RUN_ID=$(gh run list --repo "$REPO" --workflow "Build and Package" --limit 10 --json databaseId,status,conclusion --jq '.[] | select(.status=="completed" and .conclusion=="success") | .databaseId' | head -n 1)
+fi
 
 if [ -z "$RUN_ID" ]; then
     echo "❌ Error: No successful build runs found in $REPO"
