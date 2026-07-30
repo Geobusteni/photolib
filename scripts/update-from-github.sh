@@ -124,9 +124,10 @@ if [ ! -f "prisma.config.ts" ]; then
     echo "⚠️  Warning: prisma.config.ts not found"
 fi
 
-# Run migrations with more verbose output
-echo "🔧 Running prisma migrate deploy..."
-npx prisma migrate deploy
+# Apply schema changes using db push (simpler than migrations for production)
+# This syncs the database schema with prisma/schema.prisma without needing migration files
+echo "🔧 Syncing database schema..."
+npx prisma db push --accept-data-loss
 
 echo "🔄 Restarting service..."
 if command -v systemctl &> /dev/null && systemctl is-active --quiet photolib; then
