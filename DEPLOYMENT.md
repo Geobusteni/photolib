@@ -80,9 +80,40 @@ chmod +x scripts/update-from-github.sh
 
 # Run it to update
 ./scripts/update-from-github.sh
+
+# Available options:
+# --force          Force re-deploy even if already on latest version
+# --force-schema   Force schema reset (DANGEROUS - requires confirmation)
+# --help           Show help message
 ```
 
 > **Note:** Right now the repo name in the script is Geobusteni. Edit `scripts/update-from-github.sh` to set your `REPO` name.
+
+#### Data Safety Features
+
+The update script automatically protects your data:
+
+- **Empty database**: Automatically creates schema
+- **Database with no data**: Safely syncs schema
+- **Database with data**:
+  - Attempts safe migration (add columns/tables only)
+  - Shows backup command before any changes
+  - Requires `--force-schema` + typing "YES" for destructive changes
+
+**Example: Safe update (preserves data)**
+```bash
+./scripts/update-from-github.sh
+```
+
+**Example: Force schema reset (LOSES DATA)**
+```bash
+# Create backup first!
+mysqldump -uUSER -pPASS photolib > backup-$(date +%Y%m%d).sql
+
+# Then force reset
+./scripts/update-from-github.sh --force-schema
+# Type 'YES' when prompted
+```
 
 ---
 

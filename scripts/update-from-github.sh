@@ -9,11 +9,38 @@ REPO="Geobusteni/photolib"
 ARTIFACT_NAME="photolib-deploy"
 PACKAGE_FILE="photolib-deploy.tar.gz"
 FORCE_UPDATE=false
+FORCE_SCHEMA=false
 
 # Parse arguments
-if [ "$1" = "--force" ]; then
-    FORCE_UPDATE=true
-fi
+for arg in "$@"; do
+    case $arg in
+        --force)
+            FORCE_UPDATE=true
+            ;;
+        --force-schema)
+            FORCE_SCHEMA=true
+            ;;
+        --help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --force          Re-download and re-deploy even if already on latest version"
+            echo "  --force-schema   Force schema sync even if database has data (DANGEROUS)"
+            echo "  --help           Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                    # Normal update (safe)"
+            echo "  $0 --force            # Force re-deploy same version"
+            echo "  $0 --force-schema     # Reset database schema (LOSES DATA)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Run '$0 --help' for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 echo "📥 Photolib Production Update Script"
 
@@ -124,10 +151,69 @@ if [ ! -f "prisma.config.ts" ]; then
     echo "⚠️  Warning: prisma.config.ts not found"
 fi
 
-# Apply schema changes using db push (simpler than migrations for production)
-# This syncs the database schema with prisma/schema.prisma without needing migration files
-echo "🔧 Syncing database schema..."
-npx prisma db push --accept-data-loss
+echo "🔧 Checking database state..."
+
+# Parse DATABASE_URL to get connection details
+DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
+DB_PORT=$(echo "$DATABASE_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+DB_NAME=$(echo "$DATABASE_URL" | sed -n 's/.*\/\([^?]*\).*/\1/p')
+DB_USER=$(echo "$DATABASE_URL" | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
+DB_PASS=$(echo "$DATABASE_URL" | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
+
+# Check if database has any tables with data
+MYSQL_CMD="mysql -h$DB_HOST -P$DB_PORT -u$DB_USER -p$DB_PASS $DB_NAME -N -s"
+TABLE_COUNT=$($MYSQL_CMD -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$DB_NAME' AND table_type = 'BASE TABLE';" 2>/dev/null || echo "0")
+
+if [ "$TABLE_COUNT" -gt 0 ]; then
+    # Database has tables - check if any have data
+    USER_COUNT=$($MYSQL_CMD -e "SELECT COUNT(*) FROM User;" 2>/dev/null || echo "0")
+    PROJECT_COUNT=$($MYSQL_CMD -e "SELECT COUNT(*) FROM Project;" 2>/dev/null || echo "0")
+
+    if [ "$USER_COUNT" -gt 0 ] || [ "$PROJECT_COUNT" -gt 0 ]; then
+        echo "⚠️  Database contains data:"
+        echo "   - Users: $USER_COUNT"
+        echo "   - Projects: $PROJECT_COUNT"
+        echo ""
+        echo "💡 Tip: Create a backup before schema changes:"
+        echo "   mysqldump -u$DB_USER -p$DB_PASS $DB_NAME > backup-\$(date +%Y%m%d-%H%M%S).sql"
+        echo ""
+
+        if [ "$FORCE_SCHEMA" = true ]; then
+            echo "⚠️  WARNING: --force-schema flag detected!"
+            echo "⚠️  This will RESET the schema and may LOSE DATA!"
+            echo ""
+            read -p "Type 'YES' to continue: " confirm
+            if [ "$confirm" != "YES" ]; then
+                echo "❌ Aborted."
+                exit 1
+            fi
+            echo "🔧 Force syncing schema (with potential data loss)..."
+            npx prisma db push --accept-data-loss
+        else
+            echo "ℹ️  Attempting safe schema migration..."
+            echo "   This will add new tables/columns but preserve existing data."
+            echo ""
+            # Try to push without accept-data-loss first (safe migrations only)
+            if npx prisma db push; then
+                echo "✅ Schema updated safely."
+            else
+                echo ""
+                echo "❌ Schema changes require data loss or manual migration."
+                echo "   Options:"
+                echo "   1. Run with --force-schema to force sync (LOSES DATA)"
+                echo "   2. Manually review and apply schema changes"
+                echo "   3. Create and run custom migration SQL"
+                exit 1
+            fi
+        fi
+    else
+        echo "ℹ️  Database has tables but no data. Safe to sync schema."
+        npx prisma db push --accept-data-loss
+    fi
+else
+    echo "ℹ️  Database is empty. Creating initial schema..."
+    npx prisma db push --accept-data-loss
+fi
 
 echo "🔄 Restarting service..."
 if command -v systemctl &> /dev/null && systemctl is-active --quiet photolib; then
