@@ -54,7 +54,14 @@ fi
 
 # Build containers
 echo "🔨 Building Docker containers..."
-docker compose build
+echo "   This may take several minutes on first build..."
+docker compose build --no-cache || {
+  echo ""
+  echo "⚠️  Build failed. This is often due to Docker cache corruption."
+  echo "   Trying again with clean cache..."
+  docker builder prune -f
+  docker compose build --no-cache
+}
 
 # Start database first
 echo "🗄️  Starting database..."

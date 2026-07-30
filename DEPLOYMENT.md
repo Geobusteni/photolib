@@ -630,6 +630,25 @@ psql -U photolib_user photolib_db -c "SELECT COUNT(*) FROM \"Project\";"
 
 ### Docker Issues
 
+**Build fails with "snapshot does not exist: not found":**
+
+This is a Docker BuildKit cache corruption issue.
+
+```bash
+# Solution 1: Build without cache
+docker compose build --no-cache
+
+# Solution 2: Clean build cache
+docker builder prune -af
+docker compose build --no-cache
+
+# Solution 3: Complete reset
+docker compose down -v
+docker system prune -a
+docker compose build --no-cache
+docker compose up -d
+```
+
 **Permission denied / Cannot connect to Docker daemon:**
 
 ```bash
@@ -692,6 +711,12 @@ All files should be owned by `nextjs:nodejs` (UID 1001). If you need to fix perm
 
 ```bash
 docker compose exec -u root app chown -R nextjs:nodejs /app/uploads
+```
+
+**Verbose build output for debugging:**
+
+```bash
+docker compose build --progress=plain --no-cache
 ```
 
 ### Standard Deployment Issues
