@@ -827,3 +827,63 @@ Mark each phase done as it is verified:
 - [x] Phase 7 — File Serving & ZIP Downloads
 - [x] Phase 8 — Accessibility & Polish
 - [x] Phase 9 — Hardening & Deployment Prep
+- [x] Phase 10 — PostgreSQL, Prisma, Roles and Access Types
+
+---
+
+## Phase 10 — PostgreSQL, Prisma, Roles and Access Types `[DONE]`
+
+Replaced the single-admin SQLite build with a multi-user PostgreSQL application.
+
+### What changed
+
+**Database**
+- SQLite and `better-sqlite3` removed; PostgreSQL with Prisma 7 in their place.
+- Prisma 7 needs an explicit driver adapter — `lib/prisma.ts` builds the client with
+  `PrismaPg`. There is no implicit connection from `DATABASE_URL` alone.
+- Schema in `prisma/schema.prisma`: `User`, `Project`, `ProjectAssignment`, `Photo`, plus the
+  `Role` and `AccessType` enums.
+- Field naming moved to camelCase throughout (`eventDate`, `zipEnabled`, `dlCount`, …).
+
+**Configuration**
+- Consolidated to a single `.env`, mirroring `wp-config.php`. `.env.local` deleted, and no
+  other env variants may be created.
+- `.gitignore` now ignores `.env` specifically so `.env.example` stays committed.
+- Values containing `$` must be single-quoted; unquoted bcrypt hashes are silently truncated
+  by variable interpolation. This cost an hour of debugging — do not undo it.
+
+**Roles**
+- Three roles: `ADMIN` (everything), `USER` (assigned projects only), `GUEST` (read-only,
+  identified by email, no password).
+- First-run flow at `/setup` creates the first admin; `/api/setup` refuses once one exists.
+- Login accepts a username or an email.
+- The last admin cannot be deleted or demoted.
+- Admin user management at `/users`; per-project assignment on the project page.
+
+**Project access**
+- `accessType` is `PASSWORD` (one shared password) or `EMAIL` (assigned guest emails only).
+- Both are read-only for viewers. Email-based access is groundwork for future client culling
+  and notes.
+- `AccessGate` replaces `PasswordGate` and renders the right prompt for the type.
+
+**Other fixes**
+- `/login` moved out of the `(admin)` route group. Inside it, the layout's auth guard
+  redirected the login page to itself in an infinite loop.
+- Admin routes marked `force-dynamic`; otherwise Next.js prerenders them at build time and the
+  build dies on a database connection error.
+- Uploads are stored under a generated UUID rather than the client's filename, and JPEGs are
+  verified by magic bytes rather than by their declared MIME type.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run build` clean
+- Migration SQL generates correctly from the schema
+
+### Not done
+
+Requires a running PostgreSQL server, which was not available on the development machine:
+
+- [ ] Apply the migration (`npx prisma migrate dev --name init`)
+- [ ] Walk through setup → login → create project → upload → gallery end to end
+- [ ] Re-run the accessibility checklist against the new setup, users, and access-gate screens

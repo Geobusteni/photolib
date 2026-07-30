@@ -9,27 +9,24 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "archiver": "^8.0.0",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
+    "dotenv": "^17.4.2",
     "fflate": "^0.8.3",
     "iron-session": "^8.0.4",
-    "nanoid": "^5.1.16",
     "next": "16.2.12",
+    "prisma": "^7.9.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "sharp": "^0.35.3",
-    "unzipper": "^0.12.5"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/unzipper": "^0.10.11",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",

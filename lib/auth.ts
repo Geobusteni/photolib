@@ -2,9 +2,11 @@ import { getIronSession, IronSession } from 'iron-session'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
+import type { Role } from './generated/prisma/enums'
 
 export interface SessionData {
-  admin: boolean
+  userId: string
+  role: Role
 }
 
 export const sessionOptions = {
@@ -22,11 +24,16 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(cookieStore, sessionOptions)
 }
 
-export async function requireAdmin(): Promise<void> {
+export async function requireAdmin(): Promise<SessionData> {
   const session = await getSession()
-  if (!session.admin) {
-    redirect('/login')
-  }
+  if (!session.userId || session.role !== 'ADMIN') redirect('/login')
+  return session
+}
+
+export async function requireAuth(): Promise<SessionData> {
+  const session = await getSession()
+  if (!session.userId) redirect('/login')
+  return session
 }
 
 export async function hashPassword(plain: string): Promise<string> {

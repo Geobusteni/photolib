@@ -3,22 +3,36 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+type AccessType = 'PASSWORD' | 'EMAIL'
+
 interface ProjectFormProps {
   mode: 'create' | 'edit'
   projectId?: string
   defaults?: {
     title?: string
-    event_date?: string | null
-    expires_at?: string | null
-    zip_enabled?: boolean
-    dl_enabled?: boolean
+    eventDate?: Date | string | null
+    expiresAt?: Date | string | null
+    accessType?: AccessType
+    zipEnabled?: boolean
+    dlEnabled?: boolean
   }
+}
+
+const inputClass =
+  'h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100'
+
+function toDateInput(value: Date | string | null | undefined): string {
+  if (!value) return ''
+  return new Date(value).toISOString().split('T')[0]
 }
 
 export default function ProjectForm({ mode, projectId, defaults }: ProjectFormProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [accessType, setAccessType] = useState<AccessType>(defaults?.accessType ?? 'PASSWORD')
+
+  const needsPassword = accessType === 'PASSWORD'
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -26,41 +40,41 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
     setLoading(true)
 
     const form = e.currentTarget
-    const getValue = (name: string) =>
-      (form.elements.namedItem(name) as HTMLInputElement)?.value || undefined
-    const getChecked = (name: string) =>
-      (form.elements.namedItem(name) as HTMLInputElement)?.checked
+    const value = (name: string) =>
+      (form.elements.namedItem(name) as HTMLInputElement | null)?.value || undefined
+    const checked = (name: string) =>
+      (form.elements.namedItem(name) as HTMLInputElement).checked
 
-    const body: Record<string, unknown> = {
-      title: getValue('title'),
-      event_date: getValue('event_date') || null,
-      expires_at: getValue('expires_at') || null,
-      zip_enabled: getChecked('zip_enabled'),
-      dl_enabled: getChecked('dl_enabled'),
-    }
+    const password = value('password')
 
-    const password = getValue('password')
-    if (password) body.password = password
-
-    if (mode === 'create' && !password) {
-      setError('Password is required')
+    if (mode === 'create' && needsPassword && !password) {
+      setError('A gallery password is required for password-protected projects')
       setLoading(false)
       return
     }
 
-    try {
-      const url = mode === 'create' ? '/api/projects' : `/api/projects/${projectId}`
-      const method = mode === 'create' ? 'POST' : 'PUT'
+    const body: Record<string, unknown> = {
+      title: value('title'),
+      eventDate: value('eventDate') ?? null,
+      expiresAt: value('expiresAt') ?? null,
+      accessType,
+      zipEnabled: checked('zipEnabled'),
+      dlEnabled: checked('dlEnabled'),
+    }
+    if (password) body.password = password
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+    try {
+      const res = await fetch(
+        mode === 'create' ? '/api/projects' : `/api/projects/${projectId}`,
+        {
+          method: mode === 'create' ? 'POST' : 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      )
 
       if (!res.ok) {
-        const data = await res.json()
-        setError(data.error ?? 'Something went wrong')
+        setError((await res.json()).error ?? 'Something went wrong')
         return
       }
 
@@ -73,9 +87,6 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
       setLoading(false)
     }
   }
-
-  const isoToDate = (iso: string | null | undefined) =>
-    iso ? iso.split('T')[0] : ''
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
@@ -97,52 +108,70 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
         />
       </Field>
 
-      <Field label="Event date" htmlFor="event_date">
+      <Field label="Event date" htmlFor="eventDate">
         <input
-          id="event_date"
-          name="event_date"
+          id="eventDate"
+          name="eventDate"
           type="date"
-          defaultValue={isoToDate(defaults?.event_date)}
+          defaultValue={toDateInput(defaults?.eventDate)}
           className={inputClass}
         />
       </Field>
 
       <Field
-        label={mode === 'create' ? 'Gallery password' : 'New gallery password'}
-        htmlFor="password"
-        required={mode === 'create'}
-        hint={mode === 'edit' ? 'Leave blank to keep current password' : undefined}
+        label="Access type"
+        htmlFor="accessType"
+        hint="Password galleries are shared with one password. Email galleries only admit guests whose email you have assigned."
       >
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required={mode === 'create'}
+        <select
+          id="accessType"
+          name="accessType"
+          value={accessType}
+          onChange={(e) => setAccessType(e.target.value as AccessType)}
           className={inputClass}
-        />
+        >
+          <option value="PASSWORD">Password protected</option>
+          <option value="EMAIL">Email based</option>
+        </select>
       </Field>
 
-      <Field label="Expiration date" htmlFor="expires_at" hint="Gallery becomes inaccessible after this date">
+      {needsPassword && (
+        <Field
+          label={mode === 'create' ? 'Gallery password' : 'New gallery password'}
+          htmlFor="password"
+          required={mode === 'create'}
+          hint={mode === 'edit' ? 'Leave blank to keep the current password' : undefined}
+        >
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      <Field
+        label="Expiration date"
+        htmlFor="expiresAt"
+        hint="The gallery becomes inaccessible after this date"
+      >
         <input
-          id="expires_at"
-          name="expires_at"
+          id="expiresAt"
+          name="expiresAt"
           type="date"
-          defaultValue={isoToDate(defaults?.expires_at)}
+          defaultValue={toDateInput(defaults?.expiresAt)}
           className={inputClass}
         />
       </Field>
 
       <div className="flex flex-col gap-3">
+        <Toggle id="zipEnabled" label="Allow ZIP download" defaultChecked={defaults?.zipEnabled ?? true} />
         <Toggle
-          id="zip_enabled"
-          label="Allow ZIP download"
-          defaultChecked={defaults?.zip_enabled ?? true}
-        />
-        <Toggle
-          id="dl_enabled"
+          id="dlEnabled"
           label="Allow individual image downloads"
-          defaultChecked={defaults?.dl_enabled ?? true}
+          defaultChecked={defaults?.dlEnabled ?? true}
         />
       </div>
 
@@ -150,14 +179,14 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
         <button
           type="submit"
           disabled={loading}
-          className="h-10 rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          className="h-10 rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
           {loading ? 'Saving…' : mode === 'create' ? 'Create project' : 'Save changes'}
         </button>
         <button
           type="button"
           onClick={() => router.back()}
-          className="h-10 rounded-lg border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="h-10 rounded-lg border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Cancel
         </button>
@@ -165,9 +194,6 @@ export default function ProjectForm({ mode, projectId, defaults }: ProjectFormPr
     </form>
   )
 }
-
-const inputClass =
-  'h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100'
 
 function Field({
   label,

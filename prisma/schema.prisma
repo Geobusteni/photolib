@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+  GUEST
+}
+
+enum AccessType {
+  PASSWORD
+  EMAIL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String?  @unique
+  password  String?
+  name      String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments ProjectAssignment[]
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  title       String
+  eventDate   DateTime?
+  accessType  AccessType @default(PASSWORD)
+  password    String?
+  expiresAt   DateTime?
+  zipEnabled  Boolean    @default(true)
+  dlEnabled   Boolean    @default(true)
+  dlCount     Int        @default(0)
+  visitCount  Int        @default(0)
+  lastAccess  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  photos      Photo[]
+  assignments ProjectAssignment[]
+}
+
+model ProjectAssignment {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filename  String
+  width     Int
+  height    Int
+  size      Int
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}

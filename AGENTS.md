@@ -66,6 +66,72 @@ Every dependency requires clear justification. Do not install libraries "just in
 
 Framer Motion: only if a UX requirement cannot reasonably be achieved with CSS.
 
+### 9. Database Access Goes Through the ORM
+
+All database access uses Prisma. Never write raw SQL in application code, and never reach for
+a second data layer. The ORM exists so the schema can grow without rewrites — respect that by
+adding models and relations rather than denormalising into JSON blobs.
+
+Data access is centralised in `lib/`: `lib/projects.ts`, `lib/users.ts`, `lib/prisma.ts`.
+Route handlers and pages call those functions; they do not call `prisma` directly unless the
+query is a one-off ownership check.
+
+---
+
+## Configuration
+
+There is **exactly one** configuration file: `.env` in the project root, modelled on
+WordPress's `wp-config.php`. It holds the database connection, session secret, and storage
+path.
+
+Rules:
+
+- Never create `.env.local`, `.env.production`, `.env.development`, or any other env variant.
+- `.env` is gitignored. `.env.example` is committed as the documentation template.
+- Values containing `$` (bcrypt hashes, some passwords) **must** use single quotes, otherwise
+  the loader interpolates them as variable references and silently truncates the value.
+
+---
+
+## Roles and Permissions
+
+Three roles, defined in the `Role` enum:
+
+| Role    | Credentials required   | Permissions                                             |
+|---------|------------------------|---------------------------------------------------------|
+| `ADMIN` | email, username, password | Full access to everything                             |
+| `USER`  | email, username, password | Only the projects they are assigned to; nothing else  |
+| `GUEST` | email only — no login  | Read-only, only on projects they are assigned to or land on |
+
+Optional extra fields for any role: name (and further profile detail if a real need appears).
+
+Key rules:
+
+- Guests never authenticate with a password. They are recognised by email at the gallery gate.
+- Guests and users must be explicitly assigned to a project via `ProjectAssignment`.
+- The last remaining admin can never be deleted or demoted.
+- There is no self-service registration. Admins create all accounts.
+
+### First run
+
+When the database contains no admin, every route redirects to `/setup`, which creates the
+first administrator. `/api/setup` refuses to run once an admin exists.
+
+---
+
+## Project Access Types
+
+A project is either password-based or email-based. Both are **read-only for all viewers today**.
+
+| Access type | Gate                    | Notes                                                     |
+|-------------|-------------------------|-----------------------------------------------------------|
+| `PASSWORD`  | One shared password     | Default. Use when you do not have viewers' email addresses |
+| `EMAIL`     | Viewer enters their email | Only assigned guests/users are admitted                  |
+
+Email-based access exists so that future work (client culling, notes) can attribute actions to
+a person. Do not build those features until asked — but do not design anything that would make
+them impossible either.
+
 ---
 
 ## Feature Scope
@@ -74,17 +140,20 @@ Do not add anything outside this scope unless explicitly requested.
 
 ### Admin Features
 
-- Login
+- Login (username or email + password)
+- First-run admin creation
+- Create / Edit / Delete users (admin, user, guest)
+- Assign users and guests to projects
 - Create / Edit / Delete project
 - Upload JPEG images
 - Upload ZIP archive
-- Set: project title, optional event date, password, expiration
+- Set: project title, optional event date, access type, password, expiration
 - Toggle: ZIP download, image downloads
 - View: download count, gallery visit count, last access
 
 ### Client Features
 
-- Password-protected gallery
+- Password-protected or email-gated gallery
 - Responsive masonry/grid layout
 - Lightbox
 - Individual image download
@@ -211,17 +280,33 @@ Accessibility failures are bugs.
 
 ---
 
-## README Maintenance
+## Documentation Maintenance
 
-**Every time the project changes**, check `README.md` and update it if any of the following are affected:
+**Every time the project changes**, check `README.md` and update it if any of the following are
+affected:
 
-- Getting started steps (new env vars, new setup commands)
+- Installation steps (database setup, new env vars, new commands)
+- Configuration (`.env` keys)
+- Roles or permissions
+- Project access types
 - Usage instructions (new features, changed UI flows)
-- Keyboard shortcuts (added or removed)
-- File structure (new directories or conventions)
+- Keyboard shortcuts
+- File structure
 - Stack (new or removed dependencies)
 
 The README is the first thing a new person reads. Keep it accurate.
+
+Also keep these in sync when the relevant thing changes:
+
+| File              | Update when                                                      |
+|-------------------|------------------------------------------------------------------|
+| `README.md`       | Anything a user or operator would need to know                    |
+| `ARCHITECTURE.md` | Schema, routes, auth flow, component structure, or a real decision|
+| `PLAN.md`         | A phase is completed, or scope changes                            |
+| `AGENTS.md`       | A rule or convention changes                                      |
+
+When you make a non-obvious decision, add a row to the decisions log in `ARCHITECTURE.md`
+explaining why — including the ones that came from a bug, so nobody reverts the fix.
 
 ---
 

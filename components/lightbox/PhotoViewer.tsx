@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGestures } from '@/hooks/useGestures'
 import { useKeyboard } from '@/hooks/useKeyboard'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
@@ -13,6 +13,8 @@ interface PhotoViewerProps {
   onClose: () => void
   onPrev: () => void
   onNext: () => void
+  onFirst: () => void
+  onLast: () => void
 }
 
 export default function PhotoViewer({
@@ -21,6 +23,8 @@ export default function PhotoViewer({
   onClose,
   onPrev,
   onNext,
+  onFirst,
+  onLast,
 }: PhotoViewerProps) {
   const reduced = useReducedMotion()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -32,15 +36,14 @@ export default function PhotoViewer({
 
   const photo = photos[currentIndex]
 
-  function resetHideTimer() {
+  const resetHideTimer = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
     setControlsVisible(true)
     if (isFullscreen) {
       hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
     }
-  }
+  }, [isFullscreen])
 
-  // Focus trap: move focus into viewer on open
   useEffect(() => {
     closeButtonRef.current?.focus()
     return () => {
@@ -48,13 +51,16 @@ export default function PhotoViewer({
     }
   }, [])
 
-  // Start hide timer when entering fullscreen
+  // Controls only auto-hide in fullscreen; leaving it restores them permanently.
   useEffect(() => {
-    if (isFullscreen) {
-      resetHideTimer()
-    } else {
+    const timer = hideTimer.current
+    if (!isFullscreen) {
+      if (timer) clearTimeout(timer)
+      return
+    }
+    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
+    return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current)
-      setControlsVisible(true)
     }
   }, [isFullscreen])
 
@@ -75,24 +81,27 @@ export default function PhotoViewer({
     }
   }
 
-  const keyMap = useMemo(() => ({
-    Escape: () => {
-      if (isFullscreen) document.exitFullscreen().catch(() => {})
-      else onClose()
-    },
-    ArrowLeft: () => { onPrev(); resetHideTimer() },
-    ArrowRight: () => { onNext(); resetHideTimer() },
-    f: toggleFullscreen,
-    F: toggleFullscreen,
-    Home: () => {},
-    End: () => {},
-    d: () => {
-      if (photo?.original) window.open(`${photo.original}?download`, '_blank')
-    },
-    D: () => {
-      if (photo?.original) window.open(`${photo.original}?download`, '_blank')
-    },
-  }), [isFullscreen, onClose, onPrev, onNext, photo])
+  const download = useCallback(() => {
+    if (photo?.original) window.open(`${photo.original}?download`, '_blank')
+  }, [photo])
+
+  const keyMap = useMemo(
+    () => ({
+      Escape: () => {
+        if (isFullscreen) document.exitFullscreen().catch(() => {})
+        else onClose()
+      },
+      ArrowLeft: () => { onPrev(); resetHideTimer() },
+      ArrowRight: () => { onNext(); resetHideTimer() },
+      Home: () => { onFirst(); resetHideTimer() },
+      End: () => { onLast(); resetHideTimer() },
+      f: toggleFullscreen,
+      F: toggleFullscreen,
+      d: download,
+      D: download,
+    }),
+    [isFullscreen, onClose, onPrev, onNext, onFirst, onLast, download, resetHideTimer]
+  )
 
   useKeyboard(keyMap, true)
 

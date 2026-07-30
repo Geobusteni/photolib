@@ -12,8 +12,7 @@ export async function generateThumbs(projectId: string, filename: string): Promi
   const base = path.basename(filename, path.extname(filename))
   const thumbDir = thumbsDir(projectId)
 
-  const image = sharp(src)
-  const meta = await image.metadata()
+  const meta = await sharp(src).metadata()
 
   await Promise.all([
     sharp(src)
@@ -26,8 +25,5 @@ export async function generateThumbs(projectId: string, filename: string): Promi
       .toFile(path.join(thumbDir, `${base}-lg.jpg`)),
   ])
 
-  return {
-    width: meta.width ?? 0,
-    height: meta.height ?? 0,
-  }
+  return { width: meta.width ?? 0, height: meta.height ?? 0 }
 }

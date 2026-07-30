@@ -20,47 +20,59 @@ export function useGestures(
 ) {
   const start = useRef<{ x: number; y: number } | null>(null)
 
+  // Callers pass a fresh object each render; a ref keeps the listeners stable.
+  const latest = useRef(handlers)
+  useEffect(() => {
+    latest.current = handlers
+  })
+
   useEffect(() => {
     const el = ref.current
     if (!el) return
 
     function onPointerDown(e: PointerEvent) {
       start.current = { x: e.clientX, y: e.clientY }
-      el!.setPointerCapture(e.pointerId)
     }
 
     function onPointerUp(e: PointerEvent) {
       if (!start.current) return
       const dx = e.clientX - start.current.x
       const dy = e.clientY - start.current.y
-      const absDx = Math.abs(dx)
-      const absDy = Math.abs(dy)
       start.current = null
 
+      const absDx = Math.abs(dx)
+      const absDy = Math.abs(dy)
+      const h = latest.current
+
       if (absDx < TAP_THRESHOLD && absDy < TAP_THRESHOLD) {
-        handlers.onTap?.()
+        h.onTap?.()
         return
       }
 
       if (absDx > absDy) {
-        if (absDx >= SWIPE_HORIZONTAL_THRESHOLD) {
-          if (dx < 0) handlers.onSwipeLeft?.()
-          else handlers.onSwipeRight?.()
-        }
-      } else {
-        if (absDy >= SWIPE_VERTICAL_THRESHOLD) {
-          if (dy < 0) handlers.onSwipeUp?.()
-          else handlers.onSwipeDown?.()
-        }
+        if (absDx < SWIPE_HORIZONTAL_THRESHOLD) return
+        if (dx < 0) h.onSwipeLeft?.()
+        else h.onSwipeRight?.()
+        return
       }
+
+      if (absDy < SWIPE_VERTICAL_THRESHOLD) return
+      if (dy < 0) h.onSwipeUp?.()
+      else h.onSwipeDown?.()
+    }
+
+    function onPointerCancel() {
+      start.current = null
     }
 
     el.addEventListener('pointerdown', onPointerDown)
     el.addEventListener('pointerup', onPointerUp)
+    el.addEventListener('pointercancel', onPointerCancel)
 
     return () => {
       el.removeEventListener('pointerdown', onPointerDown)
       el.removeEventListener('pointerup', onPointerUp)
+      el.removeEventListener('pointercancel', onPointerCancel)
     }
-  }, [ref, handlers])
+  }, [ref])
 }

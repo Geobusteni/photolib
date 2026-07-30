@@ -1,22 +1,41 @@
 # Photolib – Architecture
 
-> Read `AGENTS.md` first for project philosophy and feature scope.
+> Read `AGENTS.md` first for project philosophy, roles, and feature scope.
 
 ---
 
 ## Tech Stack
 
-| Layer      | Technology                      |
-|------------|---------------------------------|
-| Framework  | Next.js 16 (App Router)         |
-| Language   | TypeScript 5                    |
-| UI         | React 19                        |
-| Styling    | Tailwind CSS 4                  |
-| Database   | SQLite via `better-sqlite3`     |
-| Auth       | Iron Session (signed cookies)   |
-| Images     | Sharp (server-side thumbnails)  |
+| Layer      | Technology                          |
+|------------|-------------------------------------|
+| Framework  | Next.js 16 (App Router)             |
+| Language   | TypeScript 5                        |
+| UI         | React 19                            |
+| Styling    | Tailwind CSS 4                      |
+| Database   | PostgreSQL                          |
+| ORM        | Prisma 7 (with `@prisma/adapter-pg`)|
+| Auth       | Iron Session (signed cookies) + bcryptjs |
+| Images     | Sharp (server-side thumbnails)      |
+| Archives   | fflate (ZIP create and extract)     |
 
 > Before writing any Next.js code, read the relevant guide in `node_modules/next/dist/docs/`.
+
+Prisma 7 requires a **driver adapter**; there is no implicit connection. The client is
+constructed once in `lib/prisma.ts` with `PrismaPg`.
+
+---
+
+## Configuration
+
+One file: `.env` (gitignored). `.env.example` documents it.
+
+```
+DATABASE_URL='postgresql://user:password@localhost:5432/photolib'
+SESSION_SECRET='32+ random characters'
+UPLOAD_DIR=./uploads
+```
+
+Values containing `$` must be single-quoted or the loader will interpolate and truncate them.
 
 ---
 
@@ -24,113 +43,215 @@
 
 ```
 photolib/
-├── AGENTS.md              # AI instructions (read first)
-├── ARCHITECTURE.md        # This file
-├── app/                   # Next.js App Router root
-│   ├── (admin)/           # Route group — admin area
-│   │   ├── layout.tsx     # Admin shell (auth guard)
-│   │   ├── login/
-│   │   │   └── page.tsx
-│   │   └── projects/
-│   │       ├── page.tsx              # Project list
-│   │       ├── new/
-│   │       │   └── page.tsx
-│   │       └── [id]/
-│   │           └── page.tsx          # Edit project
-│   ├── (gallery)/         # Route group — client area
-│   │   └── g/
-│   │       └── [slug]/
-│   │           └── page.tsx          # Password-protected gallery
-│   ├── api/               # Route Handlers
-│   │   ├── auth/
-│   │   │   └── route.ts              # POST login / DELETE logout
-│   │   └── projects/
-│   │       ├── route.ts              # GET list, POST create
-│   │       └── [id]/
-│   │           ├── route.ts          # GET, PUT, DELETE project
-│   │           ├── upload/
-│   │           │   └── route.ts      # POST image/ZIP upload
-│   │           └── download/
-│   │               └── route.ts      # GET ZIP archive stream
-│   ├── layout.tsx         # Root layout (html, body, fonts)
+├── AGENTS.md                  # AI instructions (read first)
+├── ARCHITECTURE.md            # This file
+├── PLAN.md                    # Phased build plan
+├── .env                       # Single config file (gitignored)
+├── .env.example               # Config template (committed)
+├── prisma/
+│   └── schema.prisma          # Single source of truth for the data model
+├── prisma.config.ts           # Prisma 7 config (schema path, datasource URL)
+├── app/
+│   ├── setup/                 # First-run admin creation
+│   │   ├── page.tsx
+│   │   └── _components/SetupForm.tsx
+│   ├── login/                 # Outside (admin) — must not inherit the auth guard
+│   │   ├── page.tsx
+│   │   └── _components/LoginForm.tsx
+│   ├── (admin)/               # Route group — authenticated area
+│   │   ├── layout.tsx         # Auth guard + setup redirect + nav
+│   │   ├── projects/
+│   │   │   ├── page.tsx               # Admin: all projects. User: assigned only
+│   │   │   ├── new/page.tsx
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx
+│   │   │       └── _components/{UploadZone,AdminPhotoGrid,AssignmentManager}.tsx
+│   │   └── users/
+│   │       ├── page.tsx               # Admin only
+│   │       └── _components/UserManager.tsx
+│   ├── (gallery)/
+│   │   └── g/[slug]/page.tsx  # Client-facing gallery
+│   ├── api/
+│   │   ├── setup/route.ts
+│   │   ├── auth/route.ts
+│   │   ├── users/
+│   │   │   ├── route.ts
+│   │   │   └── [id]/route.ts
+│   │   ├── projects/
+│   │   │   ├── route.ts
+│   │   │   └── [id]/
+│   │   │       ├── route.ts
+│   │   │       ├── auth/route.ts        # Gallery gate (password or email)
+│   │   │       ├── assignments/route.ts
+│   │   │       ├── upload/route.ts
+│   │   │       ├── download/route.ts
+│   │   │       └── photos/
+│   │   │           ├── route.ts
+│   │   │           └── [photoId]/route.ts
+│   │   └── uploads/[...path]/route.ts   # File serving
+│   ├── layout.tsx
+│   ├── error.tsx
+│   ├── not-found.tsx
 │   └── globals.css
-├── components/            # Shared UI components
-│   ├── gallery/
-│   │   ├── Gallery.tsx
-│   │   ├── ImageTile.tsx
-│   │   └── Toolbar.tsx
-│   ├── lightbox/
-│   │   ├── PhotoViewer.tsx
-│   │   ├── ViewerControls.tsx
-│   │   └── GestureHandler.tsx
-│   ├── selection/
-│   │   └── SelectionManager.tsx
-│   └── ui/               # Generic primitives (Button, etc.)
-├── lib/                   # Server-only utilities
-│   ├── db.ts              # SQLite connection singleton
-│   ├── auth.ts            # Session helpers
-│   ├── images.ts          # Sharp thumbnail generation
-│   └── projects.ts        # Data access layer
-├── hooks/                 # Client-side hooks
-│   ├── useKeyboard.ts
-│   ├── useGestures.ts
-│   └── useReducedMotion.ts
-├── uploads/               # Runtime file storage (gitignored)
-│   └── [project-slug]/
-│       ├── photos/        # Original JPEGs
-│       ├── thumbs/        # Generated thumbnails
-│       └── archive/       # ZIP files
-└── next.config.ts
+├── components/
+│   ├── gallery/{Gallery,ImageTile,Toolbar,AccessGate}.tsx
+│   ├── lightbox/{PhotoViewer,ViewerControls}.tsx
+│   └── ui/{ProjectForm,DeleteProjectButton,LogoutButton}.tsx
+├── hooks/{useKeyboard,useGestures,useReducedMotion}.ts
+├── lib/
+│   ├── prisma.ts              # Client singleton with the pg adapter
+│   ├── auth.ts                # Session, role guards, password hashing
+│   ├── users.ts               # User CRUD, setup detection
+│   ├── projects.ts            # Project/photo/assignment data access
+│   ├── gallery-auth.ts        # Gallery access: password, email, role
+│   ├── photo-data.ts          # DB record → client-facing PhotoData
+│   ├── images.ts              # Sharp thumbnails
+│   ├── storage.ts             # Upload paths, traversal guard
+│   ├── rate-limit.ts          # In-memory limiter
+│   └── generated/prisma/      # Generated client (gitignored)
+└── uploads/                   # Runtime file storage (gitignored)
+    └── [project-id]/{photos,thumbs,archive}/
 ```
+
+`/login` deliberately lives **outside** `(admin)`. Nesting it inside means the admin layout's
+auth guard would redirect the login page to itself — an infinite redirect loop.
 
 ---
 
-## Routing
+## Data Model
 
-| URL                        | Audience | Purpose                        |
-|----------------------------|----------|--------------------------------|
-| `/login`                   | Admin    | Photographer login             |
-| `/projects`                | Admin    | Dashboard — list of projects   |
-| `/projects/new`            | Admin    | Create project                 |
-| `/projects/[id]`           | Admin    | Edit project                   |
-| `/g/[slug]`                | Client   | Password-protected gallery     |
+```mermaid
+erDiagram
+    User ||--o{ ProjectAssignment : has
+    Project ||--o{ ProjectAssignment : has
+    Project ||--o{ Photo : contains
 
----
-
-## Database Schema
-
-Keep it simple. Fewer tables is better.
-
-```sql
--- One table for projects
-CREATE TABLE projects (
-  id          TEXT PRIMARY KEY,          -- nanoid slug (also URL slug)
-  title       TEXT NOT NULL,
-  event_date  TEXT,                      -- ISO date string, nullable
-  password    TEXT NOT NULL,             -- bcrypt hash
-  expires_at  TEXT,                      -- ISO datetime, nullable
-  zip_enabled INTEGER NOT NULL DEFAULT 1,
-  dl_enabled  INTEGER NOT NULL DEFAULT 1,
-  dl_count    INTEGER NOT NULL DEFAULT 0,
-  visit_count INTEGER NOT NULL DEFAULT 0,
-  last_access TEXT,                      -- ISO datetime, nullable
-  created_at  TEXT NOT NULL
-);
-
--- One table for photos
-CREATE TABLE photos (
-  id          TEXT PRIMARY KEY,          -- nanoid
-  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  filename    TEXT NOT NULL,             -- original filename
-  width       INTEGER NOT NULL,
-  height      INTEGER NOT NULL,
-  size        INTEGER NOT NULL,          -- bytes
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL
-);
+    User {
+        string id PK
+        string email UK
+        string username UK "null for guests"
+        string password "null for guests"
+        string name
+        Role role "ADMIN | USER | GUEST"
+    }
+    Project {
+        string id PK "also the gallery URL slug"
+        string title
+        datetime eventDate
+        AccessType accessType "PASSWORD | EMAIL"
+        string password "bcrypt, null when EMAIL"
+        datetime expiresAt
+        boolean zipEnabled
+        boolean dlEnabled
+        int dlCount
+        int visitCount
+        datetime lastAccess
+    }
+    ProjectAssignment {
+        string id PK
+        string projectId FK
+        string userId FK
+    }
+    Photo {
+        string id PK
+        string projectId FK
+        string filename
+        int width
+        int height
+        int size
+        int sortOrder
+    }
 ```
+
+`ProjectAssignment` has a composite unique constraint on `(projectId, userId)`, which lets the
+code use `upsert` for idempotent assignment.
 
 Only metadata lives in the database. Files live on disk.
+
+---
+
+## Authentication and Authorisation
+
+```mermaid
+flowchart TD
+    request[Incoming request] --> setupCheck{Any admin<br/>in database?}
+    setupCheck -->|No| setupPage["/setup — create first admin"]
+    setupCheck -->|Yes| sessionCheck{Valid session<br/>cookie?}
+    sessionCheck -->|No| loginPage["/login"]
+    sessionCheck -->|Yes| roleCheck{Role?}
+    roleCheck -->|ADMIN| full[Full access]
+    roleCheck -->|USER| assigned[Assigned projects only]
+    roleCheck -->|GUEST| galleryOnly[Gallery read only]
+```
+
+Two independent cookie sessions:
+
+| Cookie                        | Purpose                                        |
+|-------------------------------|------------------------------------------------|
+| `photolib_session`            | Logged-in admin or user: `{ userId, role }`    |
+| `photolib_gallery_[projectId]`| Per-project gallery grant, 7 days              |
+
+### Gallery access resolution
+
+`verifyGalleryAccess(projectId)` in `lib/gallery-auth.ts` grants access when any of these hold:
+
+1. The session belongs to an `ADMIN`.
+2. The session belongs to a `USER` **and** a `ProjectAssignment` exists for that project.
+3. A valid per-project gallery cookie exists (set by password or email at the gate).
+
+### Guarding rules
+
+- All admin routes are `force-dynamic` — they depend on session and live database state.
+  Without this, Next.js attempts to prerender them at build time and the build fails on a
+  database connection error.
+- Admin-only API routes call `requireAdmin()`, which redirects non-admins.
+- The `users` page and the project settings/danger sections render only for admins.
+
+---
+
+## API Surface
+
+### Setup and auth
+
+```
+POST   /api/setup                       Create the first admin (403 once one exists)
+POST   /api/auth                        { identifier, password } → session
+DELETE /api/auth                        Clear session
+```
+
+### Users (admin only)
+
+```
+GET    /api/users                       List users (passwords stripped)
+POST   /api/users                       Create user; guests need email only
+PUT    /api/users/[id]                  Update; blocks demoting the last admin
+DELETE /api/users/[id]                  Blocks self-deletion and the last admin
+```
+
+### Projects
+
+```
+GET    /api/projects                    List (admin)
+POST   /api/projects                    Create (admin)
+GET    /api/projects/[id]               Read (admin)
+PUT    /api/projects/[id]               Update (admin)
+DELETE /api/projects/[id]               Delete project + files (admin)
+GET    /api/projects/[id]/assignments   List assigned people (admin)
+POST   /api/projects/[id]/assignments   Assign a user/guest (admin)
+DELETE /api/projects/[id]/assignments   Unassign (admin)
+POST   /api/projects/[id]/upload        JPEG or ZIP (admin)
+DELETE /api/projects/[id]/photos/[pid]  Delete photo + files (admin)
+```
+
+### Gallery (client)
+
+```
+POST   /api/projects/[id]/auth          { password } or { email } → gallery cookie
+GET    /api/projects/[id]/photos        Photo list (requires access)
+GET    /api/projects/[id]/download      Full ZIP (requires zipEnabled)
+POST   /api/projects/[id]/download      { photoIds } → ZIP of selection
+GET    /api/uploads/[...path]           Serve a thumbnail or original
+```
 
 ---
 
@@ -139,186 +260,82 @@ Only metadata lives in the database. Files live on disk.
 ```
 uploads/
   [project-id]/
-    photos/        originals — served directly or streamed
-    thumbs/        generated at upload time by Sharp
-    archive/       pre-built ZIP or built on first download
+    photos/    originals, named [uuid].jpg
+    thumbs/    [uuid]-sm.jpg (400px), [uuid]-lg.jpg (1200px)
+    archive/   reserved
 ```
 
-Thumbnails are generated **once at upload time**. Originals are never resized per-request.
+Thumbnails are generated **once at upload**. Originals are never resized per request.
+Uploaded filenames are discarded in favour of a generated UUID, which removes an entire class
+of path and encoding bugs.
 
-Thumbnail sizes to generate:
-
-| Name   | Max dimension | Usage              |
-|--------|---------------|--------------------|
-| `sm`   | 400 px wide   | Grid thumbnail     |
-| `lg`   | 1200 px wide  | Lightbox preview   |
-
----
-
-## Authentication
-
-- Single photographer account: credentials in environment variables
-- Session stored as a signed, encrypted cookie via Iron Session
-- Admin routes protected by middleware or layout-level auth guard
-- Gallery password: per-project bcrypt hash, verified server-side and stored in a short-lived cookie per project
-
----
-
-## API Design
-
-Route Handlers in `app/api/`. Follow REST conventions. Return JSON.
-
-### Auth
-
-```
-POST   /api/auth          { username, password } → set session cookie
-DELETE /api/auth          → clear session cookie
-```
-
-### Projects (admin, requires session)
-
-```
-GET    /api/projects                   → list all projects
-POST   /api/projects                   → create project
-GET    /api/projects/[id]              → get project + photo list
-PUT    /api/projects/[id]              → update project settings
-DELETE /api/projects/[id]              → delete project + files
-POST   /api/projects/[id]/upload       → upload images or ZIP
-GET    /api/projects/[id]/download     → stream ZIP archive
-```
-
-### Gallery (client)
-
-```
-POST   /api/projects/[id]/auth         → verify gallery password → set gallery cookie
-GET    /api/projects/[id]/photos       → list photos (requires gallery cookie or admin session)
-GET    /api/projects/[id]/download     → stream ZIP (if zip_enabled)
-```
+`safeResolvePath()` in `lib/storage.ts` rejects any resolved path that escapes the project
+directory.
 
 ---
 
 ## Component Architecture
 
-### Gallery State Machine
+### Gallery state machine
 
-```
-Gallery (normal)
-  └── Toolbar: [Select] [Download ZIP]
-  └── ImageTile × N  (tap → open lightbox)
-
-Gallery (selection)
-  └── Toolbar: [Cancel] [Download Selected (N)]
-  └── ImageTile × N  (tap → toggle selection)
-
-Viewer (mobile)
-  └── GestureHandler (swipe left/right/up/down)
-  └── ViewerControls (fade in/out on tap)
-
-Viewer (desktop)
-  └── ViewerControls (always visible; auto-hide in fullscreen)
-  └── KeyboardManager
+```mermaid
+stateDiagram-v2
+    [*] --> GalleryMode
+    GalleryMode --> SelectionMode: Select / S
+    SelectionMode --> GalleryMode: Cancel / Escape
+    GalleryMode --> ViewerMode: tap or Enter on a tile
+    ViewerMode --> GalleryMode: Escape / swipe down / Close
+    ViewerMode --> ViewerFullscreen: F / fullscreen button
+    ViewerFullscreen --> ViewerMode: F / Escape
 ```
 
-### Key Components
-
-| Component           | Responsibility                                       |
-|---------------------|------------------------------------------------------|
-| `Gallery`           | Layout grid, manages gallery/selection state         |
-| `Toolbar`           | Context-sensitive top bar                            |
-| `ImageTile`         | Single photo cell, handles tap/selection             |
-| `PhotoViewer`       | Lightbox shell, owns viewer state                    |
-| `ViewerControls`    | Prev/Next/Download/Fullscreen/Close buttons          |
-| `GestureHandler`    | Pointer-event-based swipe detection (no library)     |
-| `SelectionManager`  | Tracks selected image IDs, exposes download action   |
-| `KeyboardManager`   | Global keyboard shortcuts via `keydown` listener     |
-
----
-
-## State Management
-
-Use React `useReducer` with an explicit state type rather than scattered `useState` booleans.
+Modelled as a discriminated union in a `useReducer`, not as loose booleans:
 
 ```ts
-type GalleryState =
+type GalleryMode =
   | { mode: 'gallery' }
   | { mode: 'selection'; selected: Set<string> }
-  | { mode: 'viewer'; currentId: string }
-  | { mode: 'viewer-fullscreen'; currentId: string }
+  | { mode: 'viewer'; currentIndex: number }
 ```
 
-No external state library needed at this scale.
+The lightbox cannot open while selecting, because `OPEN_VIEWER` is a no-op in selection mode.
+That constraint lives in the reducer rather than in scattered conditionals.
+
+### Key components
+
+| Component          | Responsibility                                     |
+|--------------------|----------------------------------------------------|
+| `Gallery`          | Grid layout, owns gallery/selection/viewer state    |
+| `Toolbar`          | Context-sensitive top bar                           |
+| `ImageTile`        | One photo cell; tap opens or toggles selection      |
+| `AccessGate`       | Password or email gate, chosen by `accessType`      |
+| `PhotoViewer`      | Lightbox shell, focus management, fullscreen        |
+| `ViewerControls`   | Prev/Next/Download/Fullscreen/Close                 |
+| `UserManager`      | Admin user CRUD                                     |
+| `AssignmentManager`| Assign users and guests to a project                |
 
 ---
 
-## Motion & Animation Rules
+## Motion
 
-1. Always read `prefers-reduced-motion` via `useReducedMotion` hook before applying any transition.
-2. CSS transitions only — no JS animation libraries unless absolutely necessary.
-3. All durations must have a `0ms` fallback.
-4. Animations are `opacity` and `transform` only (GPU-composited, no layout thrash).
-
-```ts
-// hooks/useReducedMotion.ts
-export function useReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-```
-
----
-
-## Environment Variables
-
-```
-# .env.local
-ADMIN_USERNAME=
-ADMIN_PASSWORD_HASH=   # bcrypt hash
-SESSION_SECRET=        # 32+ random chars for Iron Session
-UPLOAD_DIR=./uploads   # absolute path in production
-```
-
----
-
-## Image Upload Flow
-
-1. Client POSTs multipart form to `/api/projects/[id]/upload`
-2. Server validates file type (JPEG only, or ZIP)
-3. For each JPEG:
-   - Save original to `uploads/[id]/photos/`
-   - Generate `sm` and `lg` thumbnails with Sharp → `uploads/[id]/thumbs/`
-   - Insert row into `photos` table
-4. For ZIP:
-   - Extract, filter JPEGs, process each as above
-   - Delete the uploaded ZIP after extraction
-
----
-
-## ZIP Download Flow
-
-1. Client requests `/api/projects/[id]/download`
-2. Server checks `zip_enabled` flag and gallery cookie
-3. Stream a ZIP built on-the-fly from `uploads/[id]/photos/` using the `archiver` package
-4. Increment `dl_count`
-
----
-
-## Security Notes
-
-- Admin session: signed, encrypted cookie — never expose credentials to client
-- Gallery password: hashed with bcrypt — never returned to client
-- Uploaded files: validate MIME type server-side, not just extension
-- No directory traversal: always resolve paths relative to `UPLOAD_DIR`
-- Project IDs are nanoid slugs — not guessable but not secret (password protects access)
+1. `hooks/useReducedMotion.ts` reports the media query and updates on change.
+2. `globals.css` also collapses all durations under `prefers-reduced-motion: reduce`, so the
+   baseline holds even for components that forget to check.
+3. Only `opacity` and `transform` are animated.
 
 ---
 
 ## Decisions Log
 
-| Decision                        | Reason                                              |
-|---------------------------------|-----------------------------------------------------|
-| SQLite over Postgres            | Single-user app, no need for a separate DB server   |
-| Iron Session over NextAuth      | Simple single-user auth, no OAuth needed            |
-| Sharp for thumbnails            | Best-in-class Node image processing, well maintained|
-| No global state library         | `useReducer` is sufficient at this scale            |
-| No Framer Motion (yet)          | CSS transitions satisfy all current animation needs |
-| Pointer Events for gestures     | Native browser API, no dependency needed            |
-| Files on disk over object store | Simple, human-readable, no external service needed  |
+| Decision                          | Reason                                                        |
+|-----------------------------------|---------------------------------------------------------------|
+| PostgreSQL over SQLite            | Real user/role relations; room to grow beyond one machine     |
+| Prisma over raw SQL               | Typed schema and migrations; the app is expected to extend    |
+| Driver adapter (`@prisma/adapter-pg`) | Required by Prisma 7 — no implicit connection             |
+| Single `.env`                     | One place to look, like `wp-config.php`                       |
+| Iron Session over NextAuth        | No OAuth needed; sessions are two small signed cookies        |
+| Guests without passwords          | The photographer often has an email but no account to create  |
+| UUID filenames on disk            | Avoids traversal, encoding, and collision issues entirely     |
+| fflate over archiver              | Pure ESM, no CJS interop problems; handles both zip and unzip |
+| `useReducer` over a state library | One screen of state; a library would be pure overhead         |
+| Pointer Events for gestures       | Native browser API, no dependency                             |

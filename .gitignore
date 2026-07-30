@@ -38,8 +38,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env — single config file, never commit
+.env
+# .env.example is committed as a documentation template
 
 # vercel
 .vercel
@@ -49,3 +50,5 @@ yarn-error.log*
 next-env.d.ts
 photolib.db
 uploads/
+
+/lib/generated/prisma

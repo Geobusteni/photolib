@@ -1,29 +1,37 @@
 import { requireAdmin } from '@/lib/auth'
-import { listProjects, createProject } from '@/lib/projects'
+import { createProject, listProjects } from '@/lib/projects'
 import { ensureProjectDirs } from '@/lib/storage'
 import bcrypt from 'bcryptjs'
 
 export async function GET() {
   await requireAdmin()
-  return Response.json(listProjects())
+  return Response.json(await listProjects())
 }
 
 export async function POST(request: Request) {
   await requireAdmin()
 
   const body = await request.json().catch(() => null)
-  if (!body?.title || !body?.password) {
-    return Response.json({ error: 'title and password are required' }, { status: 400 })
+  if (!body?.title) {
+    return Response.json({ error: 'Title is required' }, { status: 400 })
   }
 
-  const passwordHash = await bcrypt.hash(body.password, 12)
-  const project = createProject({
+  const accessType = body.accessType === 'EMAIL' ? 'EMAIL' : 'PASSWORD'
+  if (accessType === 'PASSWORD' && !body.password) {
+    return Response.json(
+      { error: 'Password is required for password-protected projects' },
+      { status: 400 }
+    )
+  }
+
+  const project = await createProject({
     title: body.title,
-    event_date: body.event_date ?? null,
-    password: passwordHash,
-    expires_at: body.expires_at ?? null,
-    zip_enabled: body.zip_enabled !== false,
-    dl_enabled: body.dl_enabled !== false,
+    eventDate: body.eventDate ? new Date(body.eventDate) : null,
+    accessType,
+    password: accessType === 'PASSWORD' ? await bcrypt.hash(body.password, 12) : null,
+    expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+    zipEnabled: body.zipEnabled !== false,
+    dlEnabled: body.dlEnabled !== false,
   })
 
   await ensureProjectDirs(project.id)

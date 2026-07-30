@@ -1,52 +1,75 @@
 import { cookies } from 'next/headers'
 import { getIronSession } from 'iron-session'
-import { sessionOptions, getSession } from './auth'
+import { getSession } from './auth'
+import prisma from './prisma'
 import bcrypt from 'bcryptjs'
-
-const GALLERY_SESSION_OPTIONS = (projectId: string) => ({
-  password: process.env.SESSION_SECRET!,
-  cookieName: `photolib_gallery_${projectId}`,
-  cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  },
-})
 
 interface GallerySessionData {
   projectId: string
   granted: boolean
+  email?: string
+}
+
+function gallerySessionOptions(projectId: string) {
+  return {
+    password: process.env.SESSION_SECRET!,
+    cookieName: `photolib_gallery_${projectId}`,
+    cookieOptions: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7,
+    },
+  }
+}
+
+async function getGallerySession(projectId: string) {
+  const cookieStore = await cookies()
+  return getIronSession<GallerySessionData>(cookieStore, gallerySessionOptions(projectId))
 }
 
 export async function verifyGalleryAccess(projectId: string): Promise<boolean> {
-  // Admin always has access
   const adminSession = await getSession()
-  if (adminSession.admin) return true
+  if (adminSession.userId && adminSession.role === 'ADMIN') return true
 
-  // Check gallery cookie
-  const cookieStore = await cookies()
-  const gallerySession = await getIronSession<GallerySessionData>(
-    cookieStore,
-    GALLERY_SESSION_OPTIONS(projectId)
-  )
+  // USER role: must be assigned to this project
+  if (adminSession.userId && adminSession.role === 'USER') {
+    const assignment = await prisma.projectAssignment.findUnique({
+      where: { projectId_userId: { projectId, userId: adminSession.userId } },
+    })
+    return !!assignment
+  }
+
+  const gallerySession = await getGallerySession(projectId)
   return gallerySession.granted === true && gallerySession.projectId === projectId
 }
 
-export async function grantGalleryAccess(projectId: string): Promise<void> {
-  const cookieStore = await cookies()
-  const gallerySession = await getIronSession<GallerySessionData>(
-    cookieStore,
-    GALLERY_SESSION_OPTIONS(projectId)
-  )
+export async function getGalleryEmail(projectId: string): Promise<string | null> {
+  const gallerySession = await getGallerySession(projectId)
+  if (gallerySession.granted && gallerySession.projectId === projectId) {
+    return gallerySession.email ?? null
+  }
+  return null
+}
+
+export async function grantGalleryAccess(projectId: string, email?: string): Promise<void> {
+  const gallerySession = await getGallerySession(projectId)
   gallerySession.projectId = projectId
   gallerySession.granted = true
+  if (email) gallerySession.email = email
   await gallerySession.save()
 }
 
-export async function checkGalleryPassword(
-  plain: string,
-  hash: string
-): Promise<boolean> {
+export async function verifyPasswordAccess(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash)
+}
+
+export async function verifyEmailAccess(projectId: string, email: string): Promise<boolean> {
+  const normalised = email.toLowerCase().trim()
+  const user = await prisma.user.findUnique({ where: { email: normalised } })
+  if (!user) return false
+  const assignment = await prisma.projectAssignment.findUnique({
+    where: { projectId_userId: { projectId, userId: user.id } },
+  })
+  return !!assignment
 }

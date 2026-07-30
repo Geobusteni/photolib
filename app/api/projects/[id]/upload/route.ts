@@ -2,9 +2,9 @@ import { requireAdmin } from '@/lib/auth'
 import { getProject, insertPhoto } from '@/lib/projects'
 import { ensureProjectDirs, photosDir } from '@/lib/storage'
 import { generateThumbs } from '@/lib/images'
-import { nanoid } from 'nanoid'
 import path from 'path'
 import fs from 'fs/promises'
+import crypto from 'crypto'
 import { unzipSync } from 'fflate'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -12,27 +12,27 @@ type Ctx = { params: Promise<{ id: string }> }
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg'])
 const JPEG_EXTS = new Set(['.jpg', '.jpeg'])
 
-async function processJpeg(
-  projectId: string,
-  buffer: Buffer,
-  originalName: string
-): Promise<void> {
-  const photoId = nanoid(10)
-  const ext = path.extname(originalName).toLowerCase() || '.jpg'
-  const filename = `${photoId}${ext}`
-  const dest = path.join(photosDir(projectId), filename)
+// JPEG magic bytes — guards against a renamed file claiming to be an image.
+function isJpegBuffer(buffer: Buffer): boolean {
+  return buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+}
 
-  await fs.writeFile(dest, buffer)
+async function processJpeg(projectId: string, buffer: Buffer): Promise<void> {
+  if (!isJpegBuffer(buffer)) return
+
+  const photoId = crypto.randomUUID()
+  const filename = `${photoId}.jpg`
+  await fs.writeFile(path.join(photosDir(projectId), filename), buffer)
+
   const { width, height } = await generateThumbs(projectId, filename)
 
-  insertPhoto({
-    id: photoId,
-    project_id: projectId,
+  await insertPhoto({
+    projectId,
     filename,
     width,
     height,
     size: buffer.length,
-    sort_order: Date.now(),
+    sortOrder: Date.now(),
   })
 }
 
@@ -40,7 +40,7 @@ export async function POST(request: Request, ctx: Ctx) {
   await requireAdmin()
   const { id } = await ctx.params
 
-  const project = getProject(id)
+  const project = await getProject(id)
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   await ensureProjectDirs(id)
@@ -50,25 +50,26 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!file) return Response.json({ error: 'No file provided' }, { status: 400 })
 
   const buffer = Buffer.from(await file.arrayBuffer())
+  const ext = path.extname(file.name).toLowerCase()
   const isZip =
     file.type === 'application/zip' ||
     file.type === 'application/x-zip-compressed' ||
-    file.name.toLowerCase().endsWith('.zip')
-  const isJpeg =
-    ALLOWED_MIME.has(file.type) || JPEG_EXTS.has(path.extname(file.name).toLowerCase())
+    ext === '.zip'
 
-  if (isJpeg) {
-    await processJpeg(id, buffer, file.name)
+  if (ALLOWED_MIME.has(file.type) || JPEG_EXTS.has(ext)) {
+    if (!isJpegBuffer(buffer)) {
+      return Response.json({ error: 'File is not a valid JPEG' }, { status: 400 })
+    }
+    await processJpeg(id, buffer)
     return Response.json({ ok: true })
   }
 
   if (isZip) {
     const unzipped = unzipSync(new Uint8Array(buffer))
     for (const [entryPath, data] of Object.entries(unzipped)) {
-      const ext = path.extname(entryPath).toLowerCase()
-      if (!JPEG_EXTS.has(ext)) continue
-      if (path.basename(entryPath).startsWith('__MACOSX')) continue
-      await processJpeg(id, Buffer.from(data), path.basename(entryPath))
+      if (!JPEG_EXTS.has(path.extname(entryPath).toLowerCase())) continue
+      if (entryPath.startsWith('__MACOSX')) continue
+      await processJpeg(id, Buffer.from(data))
     }
     return Response.json({ ok: true })
   }
