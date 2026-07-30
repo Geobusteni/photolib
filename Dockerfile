@@ -26,8 +26,6 @@ ENV SKIP_ENV_VALIDATION=true
 # Build Next.js application with standalone output
 RUN npm run build
 
-# Remove dev dependencies
-RUN npm ci --omit=dev
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -41,13 +39,15 @@ RUN apk add --no-cache dumb-init
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder (standalone build)
+# Copy standalone output (includes everything: app code, dependencies, Prisma client)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+
+# Copy static assets (not included in standalone)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copy Prisma schema (needed for migrations at runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/lib/generated ./lib/generated
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
