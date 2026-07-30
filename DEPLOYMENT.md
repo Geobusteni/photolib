@@ -74,8 +74,8 @@ gh auth login
 Instead of `git pull`, use the update script to grab the latest build from GitHub Actions:
 
 ```bash
-# Get the script (change REPO to your repository)
-curl -fsSL https://raw.githubusercontent.com/yourusername/photolib/main/scripts/update-from-github.sh -o scripts/update-from-github.sh
+# Get the script (change REPO to your repository); for now the script is in the main brannch, on Geobusteni's project.
+curl -fsSL https://raw.githubusercontent.com/Geobusteni/photolib/main/scripts/update-from-github.sh -o scripts/update-from-github.sh
 chmod +x scripts/update-from-github.sh
 
 # Run it to update
