@@ -54,5 +54,6 @@ yarn-error.log*
 next-env.d.ts
 photolib.db
 uploads/
+!app/api/uploads
 
 /lib/generated/prisma
