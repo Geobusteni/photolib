@@ -173,6 +173,8 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
         <PhotoViewer
           photos={photos}
           currentIndex={state.currentIndex}
+          title={title}
+          projectId={projectId}
           onClose={closeViewer}
           onPrev={() => goTo(state.currentIndex - 1)}
           onNext={() => goTo(state.currentIndex + 1)}

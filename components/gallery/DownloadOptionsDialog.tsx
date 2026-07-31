@@ -110,13 +110,16 @@ export default function DownloadOptionsDialog({
         return
       }
 
-      // Unsupported browser/platform: fall back to today's per-file download,
-      // same as the existing single-image download (into Downloads/Files).
-      for (const p of downloadable) {
+      // Unsupported browser/platform: fall back to a per-file download, reusing
+      // the blobs already fetched above (a direct href to the API route would
+      // trigger the browser's native download prompt on top of this one).
+      for (const file of files) {
+        const url = URL.createObjectURL(file)
         const a = document.createElement('a')
-        a.href = p.original as string
-        a.download = p.filename
+        a.href = url
+        a.download = file.name
         a.click()
+        URL.revokeObjectURL(url)
       }
       onClose()
     } catch {
@@ -153,7 +156,7 @@ export default function DownloadOptionsDialog({
               disabled={downloadable.length === 0}
               className="flex h-11 items-center justify-center rounded-xl border border-white/30 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-40"
             >
-              {shareCapable ? 'Save to Photos' : 'Download individually'}
+              {shareCapable ? 'Share photos' : 'Download individually'}
             </button>
             <button
               onClick={onClose}

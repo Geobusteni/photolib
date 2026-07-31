@@ -265,7 +265,7 @@ above apply uniformly to native and simulated fullscreen.
 | Escape     | Close            |
 | F          | Toggle Fullscreen|
 | Space      | Play/Pause slideshow|
-| D          | Download image   |
+| D          | Open download options |
 | Home       | First image      |
 | End        | Last image       |
 

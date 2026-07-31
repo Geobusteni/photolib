@@ -240,9 +240,9 @@ the uploaded archive for download** toggle hides the button without deleting the
 ### Client gallery
 
 - **Normal mode** — tap any photo to open the full-screen viewer
-- **Selection mode** — tap "Select", choose photos, then pick **Download as ZIP** or **Save to
-  Photos** (saves each photo straight into the phone's photo gallery via the native share sheet,
-  where supported; otherwise downloads them individually)
+- **Selection mode** — tap "Select", choose photos, then pick **Download as ZIP** or **Share
+  photos** (opens the device's native share sheet, where supported, to save or send each photo;
+  otherwise downloads them individually)
 - **Lightbox on mobile** — swipe left/right to move, down to close, up for actions, pinch or
   double-tap to zoom
 - **Lightbox on desktop** — arrow keys move, `F` toggles fullscreen, `Escape` closes
@@ -265,7 +265,7 @@ the uploaded archive for download** toggle hides the button without deleting the
 | `←` / `→` | Previous / Next   |
 | `Escape`  | Close             |
 | `F`       | Toggle fullscreen |
-| `D`       | Download image    |
+| `D`       | Open download options for this photo |
 | `Home`    | First image       |
 | `End`     | Last image        |
 

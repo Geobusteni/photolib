@@ -15,6 +15,7 @@ import {
   requestFullscreen,
 } from '@/lib/fullscreen'
 import ViewerControls from './ViewerControls'
+import DownloadOptionsDialog from '@/components/gallery/DownloadOptionsDialog'
 import type { PhotoData } from '@/components/gallery/ImageTile'
 
 // 'simulated' covers platforms (iOS Safari) with no Fullscreen API for
@@ -24,6 +25,8 @@ type FullscreenMode = 'off' | 'native' | 'simulated'
 interface PhotoViewerProps {
   photos: PhotoData[]
   currentIndex: number
+  title: string
+  projectId: string
   onClose: () => void
   onPrev: () => void
   onNext: () => void
@@ -34,6 +37,8 @@ interface PhotoViewerProps {
 export default function PhotoViewer({
   photos,
   currentIndex,
+  title,
+  projectId,
   onClose,
   onPrev,
   onNext,
@@ -47,6 +52,7 @@ export default function PhotoViewer({
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [actionPanel, setActionPanel] = useState(false)
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false)
   const zoom = useImageZoom(containerRef)
 
   const photo = photos[currentIndex]
@@ -139,9 +145,9 @@ export default function PhotoViewer({
       .catch(() => setFullscreenMode('simulated'))
   }, [fullscreenMode, exitFullscreenUI])
 
-  const download = useCallback(() => {
-    if (photo?.original) window.location.href = photo.original
-  }, [photo])
+  const openDownload = useCallback(() => {
+    setDownloadDialogOpen(true)
+  }, [])
 
   const keyMap = useMemo(
     () => ({
@@ -173,8 +179,8 @@ export default function PhotoViewer({
       },
       f: toggleFullscreen,
       F: toggleFullscreen,
-      d: download,
-      D: download,
+      d: openDownload,
+      D: openDownload,
     }),
     [
       onClose,
@@ -182,7 +188,7 @@ export default function PhotoViewer({
       onNext,
       onFirst,
       onLast,
-      download,
+      openDownload,
       resetHideTimer,
       toggleFullscreen,
       fullscreenMode,
@@ -190,7 +196,7 @@ export default function PhotoViewer({
     ]
   )
 
-  useKeyboard(keyMap, true)
+  useKeyboard(keyMap, !downloadDialogOpen)
 
   useGestures(
     containerRef,
@@ -252,25 +258,27 @@ export default function PhotoViewer({
       <ViewerControls
         currentIndex={currentIndex}
         total={photos.length}
-        downloadUrl={photo.original}
+        canDownload={Boolean(photo.original)}
         isFullscreen={isFullscreen}
         controlsVisible={controlsVisible}
         onPrev={onPrev}
         onNext={onNext}
         onClose={onClose}
         onToggleFullscreen={toggleFullscreen}
+        onOpenDownload={openDownload}
       />
 
       {actionPanel && photo.original && (
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 rounded-t-2xl bg-zinc-900 p-6 sm:hidden">
-          <a
-            href={photo.original}
-            download
+          <button
+            onClick={() => {
+              setActionPanel(false)
+              openDownload()
+            }}
             className="flex h-12 items-center justify-center rounded-xl bg-white text-sm font-medium text-zinc-900"
-            onClick={() => setActionPanel(false)}
           >
             Download image
-          </a>
+          </button>
           <button
             onClick={() => setActionPanel(false)}
             className="h-12 rounded-xl text-sm font-medium text-zinc-400"
@@ -278,6 +286,15 @@ export default function PhotoViewer({
             Cancel
           </button>
         </div>
+      )}
+
+      {downloadDialogOpen && (
+        <DownloadOptionsDialog
+          photos={[photo]}
+          projectId={projectId}
+          title={title}
+          onClose={() => setDownloadDialogOpen(false)}
+        />
       )}
     </div>
   )

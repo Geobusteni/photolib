@@ -8,6 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Renamed the "Save to Photos" download option to "Share photos" — it opens the OS share sheet,
+  which offers saving among several other actions, rather than saving directly
+- Lightbox photo download now offers the same "Download as ZIP" / "Share photos" choice as the
+  gallery's selection download, instead of saving the single image directly with no options
+
+### Fixed
+
+- An extra native "save this file?" browser prompt appearing after choosing a download option or
+  downloading a single photo from the lightbox, caused by a redundant direct download alongside
+  the intended one
+
 ## [1.2.0] - 2026-07-31
 
 ### Fixed

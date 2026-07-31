@@ -6,25 +6,27 @@
 interface ViewerControlsProps {
   currentIndex: number
   total: number
-  downloadUrl: string | null
+  canDownload: boolean
   isFullscreen: boolean
   controlsVisible: boolean
   onPrev: () => void
   onNext: () => void
   onClose: () => void
   onToggleFullscreen: () => void
+  onOpenDownload: () => void
 }
 
 export default function ViewerControls({
   currentIndex,
   total,
-  downloadUrl,
+  canDownload,
   isFullscreen,
   controlsVisible,
   onPrev,
   onNext,
   onClose,
   onToggleFullscreen,
+  onOpenDownload,
 }: ViewerControlsProps) {
   const visible = controlsVisible
 
@@ -41,16 +43,15 @@ export default function ViewerControls({
           {currentIndex + 1} / {total}
         </span>
         <div className="flex items-center gap-1">
-          {downloadUrl && (
-            <a
-              href={downloadUrl}
-              download
+          {canDownload && (
+            <button
+              onClick={onOpenDownload}
               aria-label="Download image"
               className={iconBtn}
               tabIndex={visible ? 0 : -1}
             >
               <DownloadIcon />
-            </a>
+            </button>
           )}
           <button
             onClick={onToggleFullscreen}
