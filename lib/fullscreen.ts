@@ -3,8 +3,8 @@
 
 // iOS Safari has never implemented the Fullscreen API for anything other than
 // a <video> element, and older WebKit only exposes the vendor-prefixed forms.
-// Callers must treat "unsupported" and "request rejected" as the same signal
-// (fall back to simulated fullscreen) since both surface identically to a user.
+// Callers use isFullscreenSupported() to hide fullscreen controls entirely on
+// platforms without support, rather than offering one that silently no-ops.
 
 interface WebkitDocument extends Document {
   webkitFullscreenElement?: Element | null

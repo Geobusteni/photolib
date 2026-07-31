@@ -236,10 +236,9 @@ Two rules the lightbox must keep:
 - Closing it leaves browser fullscreen. Escape exits fullscreen first and closes on a second
   press; unmounting exits fullscreen unconditionally.
 
-iOS Safari has no Fullscreen API for non-`<video>` elements. Where the native API is unsupported
-(or a request rejects), the Fullscreen button falls back to a CSS-only simulated fullscreen mode
-(full-viewport image, controls hidden) so it does something meaningful everywhere. The two rules
-above apply uniformly to native and simulated fullscreen.
+iOS Safari has no Fullscreen API for non-`<video>` elements. On browsers where
+`isFullscreenSupported()` (`lib/fullscreen.ts`) reports no support, the Fullscreen control is
+hidden entirely rather than offered with nothing behind it.
 
 ### Keyboard Shortcuts
 

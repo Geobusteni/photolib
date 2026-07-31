@@ -327,15 +327,13 @@ That constraint lives in the reducer rather than in scattered conditionals.
 ### Lightbox fullscreen and zoom
 
 Fullscreen and zoom are deliberately **not** branches of the Gallery reducer above — they're
-orthogonal to gallery/selection/viewer and are owned locally by `PhotoViewer` and its hooks:
+orthogonal to gallery/selection/viewer and are owned locally by `PhotoViewer` and its hooks as a
+plain `isFullscreen` boolean.
 
-```ts
-type FullscreenMode = 'off' | 'native' | 'simulated'
-```
-
-`'simulated'` covers platforms with no Fullscreen API for non-`<video>` elements (iOS Safari —
-see Decisions Log). Both modes obey the same rules: Escape exits fullscreen before closing the
-viewer, and unmounting always exits fullscreen.
+`isFullscreenSupported()` (`lib/fullscreen.ts`) gates whether `ViewerControls` renders the
+Fullscreen button at all — platforms with no Fullscreen API for non-`<video>` elements (iOS
+Safari — see Decisions Log) never see it. Escape exits fullscreen before closing the viewer, and
+unmounting always exits fullscreen.
 
 Zoom/pan state (`hooks/useImageZoom.ts`) is similarly decoupled from gesture *recognition*
 (`hooks/useGestures.ts`), which tracks pointers by `pointerId` through an explicit
@@ -399,7 +397,7 @@ single finger pans instead once zoomed in.
 | fflate over archiver              | Pure ESM, no CJS interop problems; handles both zip and unzip |
 | `useReducer` over a state library | One screen of state; a library would be pure overhead         |
 | Pointer Events for gestures       | Native browser API, no dependency                             |
-| Simulated fullscreen fallback     | iOS Safari has no Fullscreen API for non-video elements; a CSS-only immersive mode keeps the button meaningful everywhere instead of silently failing |
+| Fullscreen control hidden when unsupported, not simulated | An earlier CSS-only "simulated fullscreen" fallback for iOS Safari never actually changed anything visually (the lightbox is already full-viewport), so the button appeared broken. Hiding it via `isFullscreenSupported()` is simpler and matches reality — Android and desktop browsers that do support the API are unaffected |
 | Gestures track pointers by `pointerId` | A single shared start position let a second finger touching down mid-swipe corrupt the gesture; per-pointer tracking is also required for pinch-to-zoom |
 | Web Share API for save-to-Photos  | No browser API writes silently into the OS photo gallery; `navigator.share({files})` is the only standards-based way, at the cost of one native confirmation tap. Falls back to per-file Downloads on unsupported browsers |
 | XMLHttpRequest for upload progress | `fetch` has no upload-progress event; XHR is the dependency-free way to report real byte-level progress on large uploads |
