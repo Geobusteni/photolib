@@ -11,7 +11,7 @@ interface ToolbarProps {
   archiveUrl: string | null
   onEnterSelection: () => void
   onExitSelection: () => void
-  onDownloadSelected: () => void
+  onOpenDownloadOptions: () => void
 }
 
 const buttonClass =
@@ -24,7 +24,7 @@ export default function Toolbar({
   archiveUrl,
   onEnterSelection,
   onExitSelection,
-  onDownloadSelected,
+  onOpenDownloadOptions,
 }: ToolbarProps) {
   return (
     <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between gap-4 bg-black/80 px-4 backdrop-blur-sm">
@@ -47,8 +47,9 @@ export default function Toolbar({
             Cancel
           </button>
           <button
-            onClick={onDownloadSelected}
+            onClick={onOpenDownloadOptions}
             disabled={selectedCount === 0}
+            aria-haspopup="dialog"
             className="inline-flex h-9 items-center justify-center rounded-lg bg-white px-3 text-center text-sm font-medium leading-none text-black transition-colors hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-40"
           >
             Download{selectedCount > 0 ? ` (${selectedCount})` : ''}

@@ -1,6 +1,6 @@
 # Photolib
 
-**Version 1.1.1** — See [`CHANGELOG.md`](./CHANGELOG.md) for details.
+**Version 1.2.0** — See [`CHANGELOG.md`](./CHANGELOG.md) for details.
 
 A private photography delivery application. Clients receive a gallery — gated by a shared
 password or by their email address — where they can view and download delivered photographs.
@@ -208,7 +208,8 @@ again. Account passwords remain hashed and cannot be read back.
 Sign in at `/login`. From **Projects** you can:
 
 - Create a project (title, event date, access type, password, expiration, download toggles)
-- Upload JPEG photos, or a ZIP that Photolib unpacks into photos
+- Upload JPEG photos, or a ZIP that Photolib unpacks into photos — the upload zone shows a
+  progress percentage, so a large photo (13MB+) doesn't look stuck
 - Upload the client-facing archive under **Download archive**
 - Assign users and guests under **People**
 - View and copy the gallery password
@@ -239,8 +240,11 @@ the uploaded archive for download** toggle hides the button without deleting the
 ### Client gallery
 
 - **Normal mode** — tap any photo to open the full-screen viewer
-- **Selection mode** — tap "Select", choose photos, download them as a ZIP
-- **Lightbox on mobile** — swipe left/right to move, down to close, up for actions
+- **Selection mode** — tap "Select", choose photos, then pick **Download as ZIP** or **Save to
+  Photos** (saves each photo straight into the phone's photo gallery via the native share sheet,
+  where supported; otherwise downloads them individually)
+- **Lightbox on mobile** — swipe left/right to move, down to close, up for actions, pinch or
+  double-tap to zoom
 - **Lightbox on desktop** — arrow keys move, `F` toggles fullscreen, `Escape` closes
 
 ### Keyboard shortcuts
@@ -251,7 +255,7 @@ the uploaded archive for download** toggle hides the button without deleting the
 |----------|---------------------------------------|
 | `S`      | Toggle selection mode                 |
 | `Escape` | Cancel selection                      |
-| `D`      | Download selected                     |
+| `D`      | Open download options for selected photos |
 | `Z`      | Download the archive, when one exists |
 
 **Lightbox**

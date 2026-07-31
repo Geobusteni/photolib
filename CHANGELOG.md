@@ -8,20 +8,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 
 ---
 
-## [Unreleased]
+## [1.2.0] - 2026-07-31
 
 ### Fixed
 
 - Compatibility with older GitHub CLI versions in `update-from-github.sh` (fixes `--status` flag error)
+- Lightbox fullscreen button doing nothing on iOS Safari, which has no Fullscreen API for
+  non-video elements — falls back to a CSS-only simulated fullscreen mode
+- Mobile lightbox gestures (tap-to-toggle-controls, swipe up/down) breaking when a second
+  finger touched the screen mid-gesture, since only one pointer's position was ever tracked
 
 ### Added
 
+- Pinch-to-zoom and double-tap-to-zoom for photos in the lightbox on mobile; panning with one
+  finger while zoomed in
+- Choice of "Download as ZIP" or "Save to Photos" when downloading selected photos — the latter
+  uses the Web Share API to save images directly into the phone's photo gallery, where supported
+- Upload progress percentage in the admin photo uploader
+- A "Preparing your download…" indicator while a selection ZIP is being built
 - GitHub Actions workflow for automated production builds and packaging
 - `scripts/sync-server.sh` for pushing builds from local to remote
 - `scripts/update-from-github.sh` for pulling latest artifacts directly on production
 - Production-only deployment model (no Git clone required on server)
 - `curl` command for easy script retrieval in `DEPLOYMENT.md`
 - systemd service configuration instructions in `DEPLOYMENT.md`
+
+### Changed
+
+- Gallery `D` keyboard shortcut now opens the download options dialog instead of immediately
+  downloading a ZIP
 
 ---
 

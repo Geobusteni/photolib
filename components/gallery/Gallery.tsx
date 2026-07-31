@@ -3,9 +3,10 @@
 
 'use client'
 
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Toolbar from './Toolbar'
 import ImageTile, { type PhotoData } from './ImageTile'
+import DownloadOptionsDialog from './DownloadOptionsDialog'
 import PhotoViewer from '@/components/lightbox/PhotoViewer'
 
 type GalleryState =
@@ -66,6 +67,8 @@ interface GalleryProps {
 export default function Gallery({ photos, title, projectId, hasArchive }: GalleryProps) {
   const [state, dispatch] = useReducer(reducer, { mode: 'gallery' })
   const openedFrom = useRef<HTMLElement | null>(null)
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false)
+  const downloadTriggerRef = useRef<HTMLElement | null>(null)
 
   const lastIndex = photos.length - 1
   const selected = state.mode === 'selection' ? state.selected : null
@@ -91,28 +94,21 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
     [lastIndex]
   )
 
-  const downloadSelected = useCallback(async () => {
+  const openDownloadDialog = useCallback(() => {
     if (!selected || selected.size === 0) return
+    downloadTriggerRef.current = document.activeElement as HTMLElement
+    setDownloadDialogOpen(true)
+  }, [selected])
 
-    const res = await fetch(`/api/projects/${projectId}/download`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photoIds: Array.from(selected) }),
-    })
-    if (!res.ok) return
+  const closeDownloadDialog = useCallback(() => {
+    setDownloadDialogOpen(false)
+    requestAnimationFrame(() => downloadTriggerRef.current?.focus())
+  }, [])
 
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${title}.zip`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [selected, projectId, title])
-
-  // Gallery-level shortcuts. The viewer registers its own while it is open.
+  // Gallery-level shortcuts. The viewer and the download dialog each
+  // register their own while open.
   useEffect(() => {
-    if (state.mode === 'viewer') return
+    if (state.mode === 'viewer' || downloadDialogOpen) return
 
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -127,7 +123,7 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
           break
         case 'd':
         case 'D':
-          if (state.mode === 'selection') downloadSelected()
+          if (state.mode === 'selection') openDownloadDialog()
           break
         case 'z':
         case 'Z':
@@ -138,7 +134,7 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [state.mode, downloadSelected, archiveUrl])
+  }, [state.mode, downloadDialogOpen, openDownloadDialog, archiveUrl])
 
   return (
     <>
@@ -149,7 +145,7 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
         archiveUrl={archiveUrl}
         onEnterSelection={() => dispatch({ type: 'ENTER_SELECTION' })}
         onExitSelection={() => dispatch({ type: 'EXIT_SELECTION' })}
-        onDownloadSelected={downloadSelected}
+        onOpenDownloadOptions={openDownloadDialog}
       />
 
       {/* The grid sits in an 80%-wide column so photos are never flush to the
@@ -182,6 +178,15 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
           onNext={() => goTo(state.currentIndex + 1)}
           onFirst={() => goTo(0)}
           onLast={() => goTo(lastIndex)}
+        />
+      )}
+
+      {downloadDialogOpen && state.mode === 'selection' && (
+        <DownloadOptionsDialog
+          photos={photos.filter((p) => state.selected.has(p.id))}
+          projectId={projectId}
+          title={title}
+          onClose={closeDownloadDialog}
         />
       )}
 

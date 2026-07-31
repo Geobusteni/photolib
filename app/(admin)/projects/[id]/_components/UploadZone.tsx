@@ -5,6 +5,8 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { postWithProgress } from '@/lib/xhr-upload'
+import ProgressBar from '@/components/ui/ProgressBar'
 
 type Strategy = 'overwrite' | 'rename' | 'skip'
 
@@ -18,6 +20,7 @@ export default function UploadZone({ projectId }: { projectId: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [conflict, setConflict] = useState<Conflict | null>(null)
 
@@ -27,8 +30,21 @@ export default function UploadZone({ projectId }: { projectId: string }) {
     const form = new FormData()
     form.append('file', file)
     if (strategy) form.append('strategy', strategy)
-    const res = await fetch(`/api/projects/${projectId}/upload`, { method: 'POST', body: form })
-    return { res, data: await res.json().catch(() => ({})) }
+    setProgress(0)
+    const lastReported = { current: 0 }
+    const { status, ok, data } = await postWithProgress(
+      `/api/projects/${projectId}/upload`,
+      form,
+      (pct) => {
+        // Throttle to >=5% deltas so screen readers and re-renders aren't
+        // flooded by raw per-byte progress events.
+        if (pct - lastReported.current >= 5 || pct === 100) {
+          lastReported.current = pct
+          setProgress(pct)
+        }
+      }
+    )
+    return { res: { status, ok }, data }
   }
 
   async function upload(files: File[], strategy?: Strategy) {
@@ -63,12 +79,14 @@ export default function UploadZone({ projectId }: { projectId: string }) {
       if (!res.ok) {
         setError(data.error ?? `Could not upload ${file.name}`)
         setStatus(null)
+        setProgress(null)
         router.refresh()
         return
       }
     }
 
     setStatus(null)
+    setProgress(null)
     router.refresh()
 
     if (pending.length > 0) setConflict({ files: pending, names })
@@ -119,7 +137,15 @@ export default function UploadZone({ projectId }: { projectId: string }) {
           }}
         />
         {busy ? (
-          <p className="text-sm text-zinc-500">{status}</p>
+          <div className="w-full max-w-xs">
+            <p aria-live="polite" className="text-sm text-zinc-500">
+              {status}
+              {progress != null ? ` — ${progress}%` : ''}
+            </p>
+            <div className="mt-2">
+              <ProgressBar value={progress ?? 0} label={status ?? 'Uploading'} />
+            </div>
+          </div>
         ) : (
           <>
             <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">

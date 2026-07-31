@@ -5,9 +5,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGestures } from '@/hooks/useGestures'
+import { useImageZoom } from '@/hooks/useImageZoom'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useKeyboard } from '@/hooks/useKeyboard'
+import {
+  exitFullscreen,
+  isFullscreenActive,
+  isFullscreenSupported,
+  requestFullscreen,
+} from '@/lib/fullscreen'
 import ViewerControls from './ViewerControls'
 import type { PhotoData } from '@/components/gallery/ImageTile'
+
+// 'simulated' covers platforms (iOS Safari) with no Fullscreen API for
+// non-video elements: the button still does something meaningful everywhere.
+type FullscreenMode = 'off' | 'native' | 'simulated'
 
 interface PhotoViewerProps {
   photos: PhotoData[]
@@ -18,8 +30,6 @@ interface PhotoViewerProps {
   onFirst: () => void
   onLast: () => void
 }
-
-const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export default function PhotoViewer({
   photos,
@@ -32,12 +42,20 @@ export default function PhotoViewer({
 }: PhotoViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fullscreenMode, setFullscreenMode] = useState<FullscreenMode>('off')
+  const isFullscreen = fullscreenMode !== 'off'
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [actionPanel, setActionPanel] = useState(false)
+  const zoom = useImageZoom(containerRef)
 
   const photo = photos[currentIndex]
+
+  // Zoom must not follow the viewer across photos.
+  useEffect(() => {
+    zoom.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex])
 
   const resetHideTimer = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
@@ -65,10 +83,11 @@ export default function PhotoViewer({
   }, [])
 
   // Closing the viewer must also leave the browser's fullscreen mode, otherwise
-  // the page stays fullscreen with nothing in it.
+  // the page stays fullscreen with nothing in it. Simulated fullscreen needs no
+  // native call — its state just disappears along with the component.
   useEffect(() => {
     return () => {
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+      if (isFullscreenActive()) exitFullscreen().catch(() => {})
     }
   }, [])
 
@@ -81,26 +100,44 @@ export default function PhotoViewer({
     }
   }, [isFullscreen])
 
+  // Latest fullscreenMode for the fullscreenchange listener below, which is
+  // registered once and must not read a stale closure value.
+  const fullscreenModeRef = useRef(fullscreenMode)
+  useEffect(() => {
+    fullscreenModeRef.current = fullscreenMode
+  })
+
+  const exitFullscreenUI = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    setControlsVisible(true)
+    setFullscreenMode('off')
+  }, [])
+
+  // Only a native session ends externally (browser back-gesture, system UI);
+  // simulated mode has no corresponding DOM event and is only ever changed by
+  // our own toggleFullscreen/Escape handling.
   useEffect(() => {
     function onFsChange() {
-      const active = !!document.fullscreenElement
-      setIsFullscreen(active)
-      if (!active) {
-        if (hideTimer.current) clearTimeout(hideTimer.current)
-        setControlsVisible(true)
-      }
+      if (!isFullscreenActive() && fullscreenModeRef.current === 'native') exitFullscreenUI()
     }
     document.addEventListener('fullscreenchange', onFsChange)
     return () => document.removeEventListener('fullscreenchange', onFsChange)
-  }, [])
+  }, [exitFullscreenUI])
 
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {})
-    } else {
-      document.exitFullscreen().catch(() => {})
+    if (fullscreenMode !== 'off') {
+      if (fullscreenMode === 'native') exitFullscreen().catch(() => {})
+      exitFullscreenUI()
+      return
     }
-  }, [])
+    if (!isFullscreenSupported()) {
+      setFullscreenMode('simulated')
+      return
+    }
+    requestFullscreen(document.documentElement)
+      .then(() => setFullscreenMode('native'))
+      .catch(() => setFullscreenMode('simulated'))
+  }, [fullscreenMode, exitFullscreenUI])
 
   const download = useCallback(() => {
     if (photo?.original) window.location.href = photo.original
@@ -108,10 +145,15 @@ export default function PhotoViewer({
 
   const keyMap = useMemo(
     () => ({
-      // Escape steps out of fullscreen first, then closes.
+      // Escape steps out of fullscreen first, then closes. Applies uniformly
+      // whether fullscreen is native or simulated.
       Escape: () => {
-        if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
-        else onClose()
+        if (fullscreenMode !== 'off') {
+          if (fullscreenMode === 'native') exitFullscreen().catch(() => {})
+          exitFullscreenUI()
+        } else {
+          onClose()
+        }
       },
       ArrowLeft: () => {
         onPrev()
@@ -134,41 +176,44 @@ export default function PhotoViewer({
       d: download,
       D: download,
     }),
-    [onClose, onPrev, onNext, onFirst, onLast, download, resetHideTimer, toggleFullscreen]
+    [
+      onClose,
+      onPrev,
+      onNext,
+      onFirst,
+      onLast,
+      download,
+      resetHideTimer,
+      toggleFullscreen,
+      fullscreenMode,
+      exitFullscreenUI,
+    ]
   )
 
   useKeyboard(keyMap, true)
 
-  useGestures(containerRef, {
-    onSwipeLeft: onNext,
-    onSwipeRight: onPrev,
-    onSwipeDown: onClose,
-    onSwipeUp: () => setActionPanel((v) => !v),
-    onTap: () => {
-      setControlsVisible((v) => !v)
-      if (isFullscreen) resetHideTimer()
+  useGestures(
+    containerRef,
+    {
+      onSwipeLeft: onNext,
+      onSwipeRight: onPrev,
+      onSwipeDown: onClose,
+      onSwipeUp: () => setActionPanel((v) => !v),
+      onTap: () => {
+        setControlsVisible((v) => !v)
+        if (isFullscreen) resetHideTimer()
+      },
+      onDoubleTap: zoom.onDoubleTap,
+      onPinchStart: zoom.onPinchStart,
+      onPinchMove: zoom.onPinchMove,
+      onPinchEnd: zoom.onPinchEnd,
+      onPanMove: zoom.onPanMove,
+      onPanEnd: zoom.onPanEnd,
     },
-  })
+    { zoomed: zoom.isZoomed() }
+  )
 
-  function trapFocus(e: React.KeyboardEvent) {
-    if (e.key !== 'Tab' || !dialogRef.current) return
-    const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-      (el) => el.offsetParent !== null || el === document.activeElement
-    )
-    if (items.length === 0) {
-      e.preventDefault()
-      return
-    }
-    const first = items[0]
-    const last = items[items.length - 1]
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault()
-      last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault()
-      first.focus()
-    }
-  }
+  const trapFocus = useFocusTrap(dialogRef)
 
   if (!photo) return null
 
@@ -179,7 +224,7 @@ export default function PhotoViewer({
       aria-modal
       tabIndex={-1}
       aria-label={`Photo viewer: image ${currentIndex + 1} of ${photos.length}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black focus:outline-none"
+      className="fixed inset-0 z-50 flex h-dvh items-center justify-center bg-black focus:outline-none"
       onMouseMove={resetHideTimer}
       onKeyDown={trapFocus}
     >
@@ -194,7 +239,12 @@ export default function PhotoViewer({
           src={photo.thumbLg}
           alt={`Photo ${currentIndex + 1} of ${photos.length}`}
           className="max-h-full max-w-full object-contain"
-          style={{ userSelect: 'none', pointerEvents: 'none' }}
+          style={{
+            userSelect: 'none',
+            pointerEvents: 'none',
+            transform: `translate(${zoom.zoom.x}px, ${zoom.zoom.y}px) scale(${zoom.zoom.scale})`,
+            transition: zoom.zoom.snapping ? 'transform 200ms' : 'none',
+          }}
           draggable={false}
         />
       </div>

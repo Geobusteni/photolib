@@ -217,6 +217,12 @@ Do not add anything outside this scope unless explicitly requested.
 | Swipe down | Close viewer        |
 | Swipe up   | Reveal action panel |
 | Tap        | Toggle controls     |
+| Pinch      | Zoom in / out (1x–4x) |
+| Double-tap | Toggle 2x zoom at the tapped point |
+
+Swipe-to-navigate and swipe up/down only fire at 1x zoom. Once zoomed in, a single finger pans
+the image instead, and a second finger continues pinching. Tap-to-toggle-controls still works at
+any zoom level.
 
 ### Desktop Lightbox Controls
 
@@ -230,6 +236,11 @@ Two rules the lightbox must keep:
 - Closing it leaves browser fullscreen. Escape exits fullscreen first and closes on a second
   press; unmounting exits fullscreen unconditionally.
 
+iOS Safari has no Fullscreen API for non-`<video>` elements. Where the native API is unsupported
+(or a request rejects), the Fullscreen button falls back to a CSS-only simulated fullscreen mode
+(full-viewport image, controls hidden) so it does something meaningful everywhere. The two rules
+above apply uniformly to native and simulated fullscreen.
+
 ### Keyboard Shortcuts
 
 **Gallery**
@@ -242,7 +253,7 @@ Two rules the lightbox must keep:
 | Space         | Select image (Selection Mode)|
 | S             | Toggle Selection Mode        |
 | Escape        | Cancel Selection Mode        |
-| D             | Download selected            |
+| D             | Open download options for selected photos |
 | Z             | Download the archive, if one exists |
 
 **Lightbox**
@@ -277,7 +288,8 @@ Two rules the lightbox must keep:
 
 Keep components small and focused. Examples:
 
-`PhotoViewer`, `Toolbar`, `Gallery`, `ImageTile`, `SelectionManager`, `KeyboardManager`, `GestureHandler`
+`PhotoViewer`, `Toolbar`, `Gallery`, `ImageTile`, `SelectionManager`, `KeyboardManager`, `GestureHandler`,
+`DownloadOptionsDialog`, `ProgressBar`
 
 Avoid giant multi-responsibility components.
 

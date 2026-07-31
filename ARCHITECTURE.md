@@ -94,10 +94,10 @@ photolib/
 │   ├── not-found.tsx
 │   └── globals.css
 ├── components/
-│   ├── gallery/{Gallery,ImageTile,Toolbar,AccessGate}.tsx
+│   ├── gallery/{Gallery,ImageTile,Toolbar,AccessGate,DownloadOptionsDialog}.tsx
 │   ├── lightbox/{PhotoViewer,ViewerControls}.tsx
-│   └── ui/{ProjectForm,DeleteProjectButton,LogoutButton}.tsx
-├── hooks/{useKeyboard,useGestures,useReducedMotion}.ts
+│   └── ui/{ProjectForm,DeleteProjectButton,LogoutButton,ProgressBar}.tsx
+├── hooks/{useKeyboard,useGestures,useImageZoom,useFocusTrap,useReducedMotion}.ts
 ├── lib/
 │   ├── prisma.ts              # Client singleton with the pg adapter
 │   ├── auth.ts                # Session, role guards, password hashing
@@ -108,6 +108,8 @@ photolib/
 │   ├── images.ts              # Sharp thumbnails
 │   ├── storage.ts             # Upload paths, traversal guard
 │   ├── rate-limit.ts          # In-memory limiter
+│   ├── fullscreen.ts          # Fullscreen API wrapper with legacy WebKit fallback
+│   ├── xhr-upload.ts          # XHR wrapper for client-side upload progress
 │   └── generated/prisma/      # Generated client (gitignored)
 └── uploads/                   # Runtime file storage (gitignored)
     └── [project-id]/{photos,thumbs,archive}/
@@ -306,8 +308,6 @@ stateDiagram-v2
     SelectionMode --> GalleryMode: Cancel / Escape
     GalleryMode --> ViewerMode: tap or Enter on a tile
     ViewerMode --> GalleryMode: Escape / swipe down / Close
-    ViewerMode --> ViewerFullscreen: F / fullscreen button
-    ViewerFullscreen --> ViewerMode: F / Escape
 ```
 
 Modelled as a discriminated union in a `useReducer`, not as loose booleans:
@@ -322,21 +322,43 @@ type GalleryMode =
 The lightbox cannot open while selecting, because `OPEN_VIEWER` is a no-op in selection mode.
 That constraint lives in the reducer rather than in scattered conditionals.
 
+### Lightbox fullscreen and zoom
+
+Fullscreen and zoom are deliberately **not** branches of the Gallery reducer above — they're
+orthogonal to gallery/selection/viewer and are owned locally by `PhotoViewer` and its hooks:
+
+```ts
+type FullscreenMode = 'off' | 'native' | 'simulated'
+```
+
+`'simulated'` covers platforms with no Fullscreen API for non-`<video>` elements (iOS Safari —
+see Decisions Log). Both modes obey the same rules: Escape exits fullscreen before closing the
+viewer, and unmounting always exits fullscreen.
+
+Zoom/pan state (`hooks/useImageZoom.ts`) is similarly decoupled from gesture *recognition*
+(`hooks/useGestures.ts`), which tracks pointers by `pointerId` through an explicit
+`idle → tracking → panning | pinching` phase machine rather than a single shared start
+position. This is what lets a second finger touching down mid-gesture start a pinch instead of
+corrupting the first finger's swipe/tap classification. Swipe-to-navigate only fires at 1×; a
+single finger pans instead once zoomed in.
+
 ### Key components
 
-| Component          | Responsibility                                     |
-|--------------------|----------------------------------------------------|
-| `Gallery`          | Grid layout, owns gallery/selection/viewer state    |
-| `Toolbar`          | Context-sensitive top bar                           |
-| `ImageTile`        | One photo cell; tap opens or toggles selection      |
-| `AccessGate`       | Password or email gate, chosen by `accessType`      |
-| `PhotoViewer`      | Lightbox shell, focus management, fullscreen        |
-| `ViewerControls`   | Prev/Next/Download/Fullscreen/Close                 |
-| `UserManager`      | Admin user CRUD                                     |
-| `AssignmentManager`| Assign users and guests to a project                |
-| `ArchiveManager`   | Upload/replace/remove the client-facing ZIP         |
-| `PasswordReveal`   | Show and copy a project's gallery password          |
-| `UploadZone`       | Photo upload, including duplicate resolution        |
+| Component               | Responsibility                                      |
+|--------------------------|-----------------------------------------------------|
+| `Gallery`                | Grid layout, owns gallery/selection/viewer state     |
+| `Toolbar`                | Context-sensitive top bar                            |
+| `ImageTile`              | One photo cell; tap opens or toggles selection       |
+| `AccessGate`             | Password or email gate, chosen by `accessType`       |
+| `DownloadOptionsDialog`  | ZIP vs. Save-to-Photos choice for selected photos    |
+| `PhotoViewer`            | Lightbox shell, focus management, fullscreen, zoom   |
+| `ViewerControls`         | Prev/Next/Download/Fullscreen/Close                  |
+| `ProgressBar`            | Determinate/indeterminate progress indicator         |
+| `UserManager`            | Admin user CRUD                                      |
+| `AssignmentManager`      | Assign users and guests to a project                 |
+| `ArchiveManager`         | Upload/replace/remove the client-facing ZIP          |
+| `PasswordReveal`         | Show and copy a project's gallery password           |
+| `UploadZone`             | Photo upload, including duplicate resolution and progress |
 
 ---
 
@@ -372,3 +394,8 @@ That constraint lives in the reducer rather than in scattered conditionals.
 | fflate over archiver              | Pure ESM, no CJS interop problems; handles both zip and unzip |
 | `useReducer` over a state library | One screen of state; a library would be pure overhead         |
 | Pointer Events for gestures       | Native browser API, no dependency                             |
+| Simulated fullscreen fallback     | iOS Safari has no Fullscreen API for non-video elements; a CSS-only immersive mode keeps the button meaningful everywhere instead of silently failing |
+| Gestures track pointers by `pointerId` | A single shared start position let a second finger touching down mid-swipe corrupt the gesture; per-pointer tracking is also required for pinch-to-zoom |
+| Web Share API for save-to-Photos  | No browser API writes silently into the OS photo gallery; `navigator.share({files})` is the only standards-based way, at the cost of one native confirmation tap. Falls back to per-file Downloads on unsupported browsers |
+| XMLHttpRequest for upload progress | `fetch` has no upload-progress event; XHR is the dependency-free way to report real byte-level progress on large uploads |
+| Selection ZIP progress is indeterminate | The ZIP is built with one buffered, synchronous `zipSync` call server-side (see "Archive uploaded, never generated" above) — there is no incremental signal to report a real percentage from |
