@@ -265,6 +265,8 @@ GET    /api/projects/[id]/photos                  Photo list (requires access)
 GET    /api/projects/[id]/download                The uploaded archive; 404 if none
 POST   /api/projects/[id]/download                { photoIds } → ZIP of selection
 GET    /api/projects/[id]/photos/[pid]/download   One original, under its original name
+                                                    ?variant=share serves the compressed
+                                                    ~2048px variant instead
 GET    /api/uploads/[...path]                     Thumbnails only
 ```
 
@@ -276,7 +278,7 @@ GET    /api/uploads/[...path]                     Thumbnails only
 uploads/
   [project-id]/
     photos/    originals, named [uuid].jpg
-    thumbs/    [uuid]-sm.jpg (400px), [uuid]-lg.jpg (1200px)
+    thumbs/    [uuid]-sm.jpg (400px), [uuid]-lg.jpg (1200px), [uuid]-share.jpg (2048px)
     archive/   archive.zip — the ZIP the photographer uploaded, if any
 ```
 
@@ -389,6 +391,7 @@ single finger pans instead once zoomed in.
 | Lightbox photo prefetched on dialog mount, keyed by photo id | `navigator.share()` needs a fresh user gesture; fetching the photo inside the click handler risked losing that window on slow connections. Scoped to the single-photo case (the lightbox's only usage) so multi-select downloads don't eagerly fetch photos a user may not pick |
 | `/api/uploads` serves thumbs only | Originals and archives have routes that check access and count downloads; a second unguarded path defeated both |
 | Upload conflicts answer 409       | Silently overwriting a client's photo is worse than asking     |
+| Individual download/share sends a compressed ~2048px variant, not the true original | Mobile `navigator.share()` fetching a multi-MB original stalls or fails; ZIP downloads (archive and selection) still fetch true originals server-side, unaffected |
 | `sortOrder` counts up from max    | Prisma `Int` is a 32-bit PostgreSQL `INTEGER`; `Date.now()` overflows it |
 | Upload deletes files on failure   | A failed insert used to leave orphaned files on disk          |
 | Viewer focuses the dialog, not a button | The old focus holder used `focus:not-sr-only` and painted a stray label over the controls |

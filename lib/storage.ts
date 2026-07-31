@@ -55,6 +55,7 @@ export async function deletePhotoFiles(projectId: string, filename: string): Pro
     fs.rm(path.join(photosDir(projectId), filename), { force: true }),
     fs.rm(path.join(thumbsDir(projectId), `${base}-sm.jpg`), { force: true }),
     fs.rm(path.join(thumbsDir(projectId), `${base}-lg.jpg`), { force: true }),
+    fs.rm(path.join(thumbsDir(projectId), `${base}-share.jpg`), { force: true }),
   ])
 }
 

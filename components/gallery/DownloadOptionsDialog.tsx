@@ -46,8 +46,12 @@ function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
 }
 
+// Individual downloads/shares use the compressed ~2048px "share" variant, not the true
+// original — mobile navigator.share() fails/times out fetching multi-MB originals over a
+// cellular connection. Full-resolution originals stay reserved for the ZIP paths.
 async function fetchAsFile(photo: PhotoData): Promise<File> {
-  const res = await fetch(photo.original as string)
+  const url = `${photo.original as string}?variant=share`
+  const res = await fetch(url)
   if (!res.ok) throw new Error(`could not fetch ${photo.filename}`)
   const blob = await res.blob()
   return new File([blob], photo.filename, { type: blob.type || 'image/jpeg' })

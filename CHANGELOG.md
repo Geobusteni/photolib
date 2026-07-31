@@ -16,6 +16,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
   which offers saving among several other actions, rather than saving directly
 - Lightbox photo download now offers the same "Download as ZIP" / "Share photos" choice as the
   gallery's selection download, instead of saving the single image directly with no options
+- Individual photo download and sharing now send a compressed ~2048px version of the photo
+  instead of the full-resolution original, so mobile sharing of multi-megabyte photos doesn't
+  stall or fail. Downloading a project's ZIP archive or a selection as a ZIP still delivers
+  full-resolution originals, unchanged. **Action required:** run
+  `node scripts/backfill-share-thumbs.mjs` once after upgrading so already-uploaded photos get
+  this new variant
 
 ### Fixed
 
@@ -27,6 +33,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 - Sharing a single photo from the lightbox on mobile intermittently failing with "Could not share
   the photos," especially on slower connections, because fetching the photo before opening the
   share sheet could run out the window browsers allow after a tap before requiring a fresh one
+- Sharing large (multi-megabyte) photos from the lightbox on mobile still failing even after the
+  above fix, because the true original was still being fetched over the network before sharing
 
 ## [1.2.0] - 2026-07-31
 
