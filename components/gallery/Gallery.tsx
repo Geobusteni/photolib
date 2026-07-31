@@ -148,8 +148,8 @@ export default function Gallery({ photos, title, projectId, hasArchive }: Galler
         onOpenDownloadOptions={openDownloadDialog}
       />
 
-      {/* The grid sits in an 80%-wide column so photos are never flush to the
-          viewport edges, with breathing room above and below. */}
+      {/* The grid sits in an 80%-wide column, so photos are never flush to the
+          viewport edges, with the breathing room above and below. */}
       <main className="mx-auto w-[90%] max-w-[1600px] pb-16 pt-24 sm:w-[80%]">
         <h1 className="sr-only">{title}</h1>
         <div className="columns-2 gap-2 sm:columns-3 lg:columns-4">

@@ -37,7 +37,7 @@ export default function Toolbar({
           </button>
           {archiveUrl && (
             <a href={archiveUrl} download className={buttonClass}>
-              Download ZIP
+              Download All (Original ZIP)
             </a>
           )}
         </div>
