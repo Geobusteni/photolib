@@ -113,6 +113,9 @@ echo "📦 Extracting package..."
 tar -xzf "$PACKAGE_FILE"
 rm "$PACKAGE_FILE"
 
+# Make scripts executable
+chmod +x scripts/*.sh 2>/dev/null || true
+
 echo "🔧 Checking for .env..."
 if [ ! -f ".env" ]; then
     echo "⚠️  .env not found. Copying .env.example..."
