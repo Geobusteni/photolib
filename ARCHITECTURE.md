@@ -385,6 +385,8 @@ single finger pans instead once zoomed in.
 | `originalName` stored separately  | Clients need the name they recognise; the disk does not       |
 | Gallery passwords encrypted, not hashed | The photographer must read them back to send them on. Account passwords stay bcrypt-hashed |
 | Archive uploaded, never generated | Zipping thousands of originals per request is slow and memory-hungry, and duplicates an export the photographer already has |
+| Blob-download `revokeObjectURL` deferred via `setTimeout` | Revoking immediately after `a.click()` races the browser's (often async) download start and can silently no-op the download on some browsers |
+| Lightbox photo prefetched on dialog mount, keyed by photo id | `navigator.share()` needs a fresh user gesture; fetching the photo inside the click handler risked losing that window on slow connections. Scoped to the single-photo case (the lightbox's only usage) so multi-select downloads don't eagerly fetch photos a user may not pick |
 | `/api/uploads` serves thumbs only | Originals and archives have routes that check access and count downloads; a second unguarded path defeated both |
 | Upload conflicts answer 409       | Silently overwriting a client's photo is worse than asking     |
 | `sortOrder` counts up from max    | Prisma `Int` is a 32-bit PostgreSQL `INTEGER`; `Date.now()` overflows it |

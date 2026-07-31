@@ -30,6 +30,29 @@ const shareCapable =
   typeof navigator.share === 'function' &&
   typeof navigator.canShare === 'function'
 
+// Revoking the object URL must wait until the browser has actually started
+// reading the blob — revoking synchronously after click() races the
+// (often async) download start and can silently no-op it.
+const REVOKE_DELAY_MS = 1000
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
+}
+
+async function fetchAsFile(photo: PhotoData): Promise<File> {
+  const res = await fetch(photo.original as string)
+  if (!res.ok) throw new Error(`could not fetch ${photo.filename}`)
+  const blob = await res.blob()
+  return new File([blob], photo.filename, { type: blob.type || 'image/jpeg' })
+}
+
 export default function DownloadOptionsDialog({
   photos,
   projectId,
@@ -40,13 +63,29 @@ export default function DownloadOptionsDialog({
   const zipButtonRef = useRef<HTMLButtonElement>(null)
   const trapFocus = useFocusTrap(dialogRef)
   const [phase, setPhase] = useState<Phase>({ kind: 'choosing' })
+  const singlePhotoPrefetchRef = useRef<Promise<File> | null>(null)
 
   const downloadable = useMemo(() => photos.filter((p) => p.original), [photos])
   const busy = phase.kind === 'zipping' || phase.kind === 'fetching'
+  const singlePhoto = downloadable.length === 1 ? downloadable[0] : null
 
   useEffect(() => {
     zipButtonRef.current?.focus({ preventScroll: true })
   }, [])
+
+  // Fetch the single photo as soon as the dialog opens so that, by the time
+  // the user taps Share, navigator.share() can fire off the fresh click with
+  // no network-bound await in between — that gap is what lets browsers'
+  // user-activation window for Web Share expire on slow connections.
+  useEffect(() => {
+    if (!singlePhoto) return
+    const promise = fetchAsFile(singlePhoto)
+    promise.catch(() => {})
+    singlePhotoPrefetchRef.current = promise
+    // singlePhoto is derived fresh each render; keying on its id (not the
+    // object) avoids re-fetching on every re-render of the same photo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singlePhoto?.id])
 
   const keyMap = useMemo(
     () => ({
@@ -68,29 +107,54 @@ export default function DownloadOptionsDialog({
       })
       if (!res.ok) throw new Error('zip failed')
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${title}.zip`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${title}.zip`)
       onClose()
     } catch {
       setPhase({ kind: 'error', message: 'Could not build the ZIP archive. Please try again.' })
     }
   }, [photos, projectId, title, onClose])
 
-  const handleIndividual = useCallback(async () => {
-    if (downloadable.length === 0) return
+  // Single-photo path (the lightbox's only usage): consumes the eager
+  // prefetch so navigator.share() runs immediately off the click, keeping
+  // it inside the browser's user-activation window.
+  const handleSingleIndividual = useCallback(async () => {
+    const photo = downloadable[0]
+    setPhase({ kind: 'fetching', done: 0, total: 1 })
+
+    try {
+      const file = await (singlePhotoPrefetchRef.current ?? fetchAsFile(photo))
+      setPhase({ kind: 'fetching', done: 1, total: 1 })
+
+      if (shareCapable && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] })
+          onClose()
+        } catch (err) {
+          // The user dismissing the native share sheet is a normal cancel,
+          // not a failure.
+          if (err instanceof Error && err.name === 'AbortError') {
+            setPhase({ kind: 'choosing' })
+          } else {
+            setPhase({ kind: 'error', message: 'Could not share the photos. Please try again.' })
+          }
+        }
+        return
+      }
+
+      downloadBlob(file, file.name)
+      onClose()
+    } catch {
+      setPhase({ kind: 'error', message: 'Could not fetch the photo. Please try again.' })
+    }
+  }, [downloadable, onClose])
+
+  const handleMultiIndividual = useCallback(async () => {
     setPhase({ kind: 'fetching', done: 0, total: downloadable.length })
 
     try {
       const files: File[] = []
       for (const [i, p] of downloadable.entries()) {
-        const res = await fetch(p.original as string)
-        if (!res.ok) throw new Error(`could not fetch ${p.filename}`)
-        const blob = await res.blob()
-        files.push(new File([blob], p.filename, { type: blob.type || 'image/jpeg' }))
+        files.push(await fetchAsFile(p))
         setPhase({ kind: 'fetching', done: i + 1, total: downloadable.length })
       }
 
@@ -113,19 +177,21 @@ export default function DownloadOptionsDialog({
       // Unsupported browser/platform: fall back to a per-file download, reusing
       // the blobs already fetched above (a direct href to the API route would
       // trigger the browser's native download prompt on top of this one).
-      for (const file of files) {
-        const url = URL.createObjectURL(file)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = file.name
-        a.click()
-        URL.revokeObjectURL(url)
-      }
+      files.forEach((file) => downloadBlob(file, file.name))
       onClose()
     } catch {
       setPhase({ kind: 'error', message: 'Could not fetch all photos. Please try again.' })
     }
   }, [downloadable, onClose])
+
+  const handleIndividual = useCallback(async () => {
+    if (downloadable.length === 0) return
+    if (downloadable.length === 1) {
+      await handleSingleIndividual()
+    } else {
+      await handleMultiIndividual()
+    }
+  }, [downloadable, handleSingleIndividual, handleMultiIndividual])
 
   return (
     <div

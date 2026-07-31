@@ -22,6 +22,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 - An extra native "save this file?" browser prompt appearing after choosing a download option or
   downloading a single photo from the lightbox, caused by a redundant direct download alongside
   the intended one
+- Downloading a photo or ZIP on desktop sometimes doing nothing even though the file had already
+  been fetched, because the browser download was never reliably triggered
+- Sharing a single photo from the lightbox on mobile intermittently failing with "Could not share
+  the photos," especially on slower connections, because fetching the photo before opening the
+  share sheet could run out the window browsers allow after a tap before requiring a fresh one
 
 ## [1.2.0] - 2026-07-31
 
