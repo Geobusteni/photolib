@@ -7,6 +7,7 @@ interface ViewerControlsProps {
   currentIndex: number
   total: number
   canDownload: boolean
+  fullscreenCapable: boolean
   isFullscreen: boolean
   controlsVisible: boolean
   onPrev: () => void
@@ -20,6 +21,7 @@ export default function ViewerControls({
   currentIndex,
   total,
   canDownload,
+  fullscreenCapable,
   isFullscreen,
   controlsVisible,
   onPrev,
@@ -53,14 +55,16 @@ export default function ViewerControls({
               <DownloadIcon />
             </button>
           )}
-          <button
-            onClick={onToggleFullscreen}
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            className={iconBtn}
-            tabIndex={visible ? 0 : -1}
-          >
-            {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-          </button>
+          {fullscreenCapable && (
+            <button
+              onClick={onToggleFullscreen}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              className={iconBtn}
+              tabIndex={visible ? 0 : -1}
+            >
+              {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Close viewer"

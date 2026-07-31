@@ -10,6 +10,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-31
+
 ### Changed
 
 - Renamed the "Save to Photos" download option to "Share photos" — it opens the OS share sheet,
@@ -35,6 +37,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
   share sheet could run out the window browsers allow after a tap before requiring a fresh one
 - Sharing large (multi-megabyte) photos from the lightbox on mobile still failing even after the
   above fix, because the true original was still being fetched over the network before sharing
+- The lightbox Fullscreen button doing nothing on browsers without a Fullscreen API (notably iOS
+  Safari) — its "simulated fullscreen" fallback never actually changed anything visually. The
+  button is now hidden entirely on those browsers instead of appearing broken
 
 ## [1.2.0] - 2026-07-31
 

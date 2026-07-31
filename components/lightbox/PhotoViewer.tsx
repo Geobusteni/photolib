@@ -18,10 +18,6 @@ import ViewerControls from './ViewerControls'
 import DownloadOptionsDialog from '@/components/gallery/DownloadOptionsDialog'
 import type { PhotoData } from '@/components/gallery/ImageTile'
 
-// 'simulated' covers platforms (iOS Safari) with no Fullscreen API for
-// non-video elements: the button still does something meaningful everywhere.
-type FullscreenMode = 'off' | 'native' | 'simulated'
-
 interface PhotoViewerProps {
   photos: PhotoData[]
   currentIndex: number
@@ -47,8 +43,10 @@ export default function PhotoViewer({
 }: PhotoViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [fullscreenMode, setFullscreenMode] = useState<FullscreenMode>('off')
-  const isFullscreen = fullscreenMode !== 'off'
+  // iOS Safari has no Fullscreen API for non-<video> elements. Rather than offer a
+  // control with nothing behind it there, the control itself is hidden.
+  const [fullscreenCapable] = useState(() => isFullscreenSupported())
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [actionPanel, setActionPanel] = useState(false)
@@ -89,8 +87,7 @@ export default function PhotoViewer({
   }, [])
 
   // Closing the viewer must also leave the browser's fullscreen mode, otherwise
-  // the page stays fullscreen with nothing in it. Simulated fullscreen needs no
-  // native call — its state just disappears along with the component.
+  // the page stays fullscreen with nothing in it.
   useEffect(() => {
     return () => {
       if (isFullscreenActive()) exitFullscreen().catch(() => {})
@@ -106,44 +103,34 @@ export default function PhotoViewer({
     }
   }, [isFullscreen])
 
-  // Latest fullscreenMode for the fullscreenchange listener below, which is
-  // registered once and must not read a stale closure value.
-  const fullscreenModeRef = useRef(fullscreenMode)
-  useEffect(() => {
-    fullscreenModeRef.current = fullscreenMode
-  })
-
   const exitFullscreenUI = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
     setControlsVisible(true)
-    setFullscreenMode('off')
+    setIsFullscreen(false)
   }, [])
 
-  // Only a native session ends externally (browser back-gesture, system UI);
-  // simulated mode has no corresponding DOM event and is only ever changed by
-  // our own toggleFullscreen/Escape handling.
+  // A fullscreen session can also end externally (browser back-gesture, system UI),
+  // which only fires this DOM event, never our own toggle/Escape handling.
   useEffect(() => {
+    if (!isFullscreen) return
     function onFsChange() {
-      if (!isFullscreenActive() && fullscreenModeRef.current === 'native') exitFullscreenUI()
+      if (!isFullscreenActive()) exitFullscreenUI()
     }
     document.addEventListener('fullscreenchange', onFsChange)
     return () => document.removeEventListener('fullscreenchange', onFsChange)
-  }, [exitFullscreenUI])
+  }, [isFullscreen, exitFullscreenUI])
 
   const toggleFullscreen = useCallback(() => {
-    if (fullscreenMode !== 'off') {
-      if (fullscreenMode === 'native') exitFullscreen().catch(() => {})
+    if (isFullscreen) {
+      exitFullscreen().catch(() => {})
       exitFullscreenUI()
       return
     }
-    if (!isFullscreenSupported()) {
-      setFullscreenMode('simulated')
-      return
-    }
+    if (!fullscreenCapable) return
     requestFullscreen(document.documentElement)
-      .then(() => setFullscreenMode('native'))
-      .catch(() => setFullscreenMode('simulated'))
-  }, [fullscreenMode, exitFullscreenUI])
+      .then(() => setIsFullscreen(true))
+      .catch(() => {})
+  }, [isFullscreen, fullscreenCapable, exitFullscreenUI])
 
   const openDownload = useCallback(() => {
     setDownloadDialogOpen(true)
@@ -151,11 +138,10 @@ export default function PhotoViewer({
 
   const keyMap = useMemo(
     () => ({
-      // Escape steps out of fullscreen first, then closes. Applies uniformly
-      // whether fullscreen is native or simulated.
+      // Escape steps out of fullscreen first, then closes.
       Escape: () => {
-        if (fullscreenMode !== 'off') {
-          if (fullscreenMode === 'native') exitFullscreen().catch(() => {})
+        if (isFullscreen) {
+          exitFullscreen().catch(() => {})
           exitFullscreenUI()
         } else {
           onClose()
@@ -191,7 +177,7 @@ export default function PhotoViewer({
       openDownload,
       resetHideTimer,
       toggleFullscreen,
-      fullscreenMode,
+      isFullscreen,
       exitFullscreenUI,
     ]
   )
@@ -259,6 +245,7 @@ export default function PhotoViewer({
         currentIndex={currentIndex}
         total={photos.length}
         canDownload={Boolean(photo.original)}
+        fullscreenCapable={fullscreenCapable}
         isFullscreen={isFullscreen}
         controlsVisible={controlsVisible}
         onPrev={onPrev}
